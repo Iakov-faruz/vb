@@ -91,15 +91,18 @@ def execute_on_vm(
     client.set_missing_host_key_policy(PinnedHostKeyPolicy())
     try:
         _connect(client, timeout, password)
-        _, stdout, stderr = client.exec_command(command, timeout=timeout)
+        stdin, stdout, stderr = client.exec_command(command, timeout=timeout)
+
+        # כתיבה ל-stdin לפני קריאת הפלט למניעת Deadlock
         if stdin_data is not None:
-            stdin = stdout.channel.makefile_stdin("w")
             stdin.write(stdin_data)
             stdin.flush()
             stdin.channel.shutdown_write()
+
         output = stdout.read().decode("utf-8", errors="replace")
         error_output = stderr.read().decode("utf-8", errors="replace")
         exit_status = stdout.channel.recv_exit_status()
+
         if exit_status != 0:
             raise VMCommandError(exit_status, error_output, output)
         if error_output:
