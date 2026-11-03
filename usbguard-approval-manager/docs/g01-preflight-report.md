@@ -1,21 +1,26 @@
 # G-01 Lab Preflight Report
 
-**Checked:** 2026-11-03 20:38 UTC
+**Checked:** 2026-11-03 20:44 UTC
 **Overall G-01 status:** `UNVERIFIED`  
 **Scope:** Isolated live testing with the unmounted disposable USB and
 temporary policy files under `/run`; a later bounded test also started the
 installed service and temporarily changed then restored its RuleFile. Clock
 and reboot tests were not run.
 
-## Latest clean-clone verification — 2026-11-03 20:38 UTC
+## Latest clean-clone verification — 2026-11-03 20:44 UTC
 
 The VM was updated from the pushed repository and its clean clone is at commit
-`c1d917b`. `make test` passed, including shell syntax checks, all shell unit
-tests, and all 21 Python tests.
+`769adf3`. `make test` passed, including quick-script syntax checks, all shell
+unit tests, and all 21 Python tests. The USB status quick check passed 4/4 and
+the clock quick check passed 6/6. The G-01 status check returned `1`, as
+expected with the installed service inactive and the evidence marker absent.
+The integration wrapper refused to run without the explicit confirmation
+value; none changed the service, USB authorization, or installed policy.
 
-The isolated integration test used the USB `048d:1234`, a temporary daemon
-configuration, and a temporary policy under `/run`. Its initial kernel
-authorization was `0`, so no USB disk node was present. The test verified:
+The explicit-confirmation integration wrapper then used USB `048d:1234`, a
+temporary daemon configuration, and a temporary policy under `/run`. Its
+initial kernel authorization was `0`, so no USB disk node was present. The
+test verified:
 
 - `append-rule --temporary` did not authorize the connected device; the
   explicit `allow-device` operation did.
@@ -32,7 +37,7 @@ authorization was `0`, so no USB disk node was present. The test verified:
 The script returned its expected exit status `9`; this means the verified USB
 observations did not certify the outstanding clock/reboot gates. Evidence is
 retained at
-`/var/tmp/usbguard-approval-manager-g01-c1d917b/g01-20261103T203827Z.p8GbPh`.
+`/var/tmp/usbguard-approval-manager-g01-769adf3/g01-20261103T204430Z.50x7hP`.
 The installed service and persistent policy were not changed by this run.
 
 Clock observations were `ntpsec` active, `NTPSynchronized=yes`, and one

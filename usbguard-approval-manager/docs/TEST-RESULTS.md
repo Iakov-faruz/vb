@@ -145,12 +145,19 @@ unapproved example, and no actual reboot was performed.
 
 ## 6. Isolated G-01 Integration — VM Results
 
-The clean VM clone at commit `c1d917b` passed `make test`, including shell
-syntax checks, all shell unit tests, and all 21 Python tests. The bounded lab
-integration was then run against the disposable USB `048d:1234` using a
-temporary daemon configuration and policy. USB-state and rule behavior passed;
-the script returned its expected exit status `9` because the clock/reboot
-gates are intentionally not certified:
+The clean VM clone at commit `769adf3` passed `make test`, including shell
+syntax checks for quick checks, all shell unit tests, and all 21 Python tests.
+The USB status quick check passed 4/4; the clock check passed 6/6. The G-01
+status check returned `1` as expected because the service is inactive and no
+verified marker exists. The integration wrapper also refused to run without
+the explicit confirmation value. These read-only/refusal checks did not
+change service, USB, or policy state.
+
+The bounded lab integration was then run through the explicit-confirmation
+wrapper against the disposable USB `048d:1234` using a temporary daemon
+configuration and policy. USB-state and rule behavior passed; the wrapper
+returned its expected exit status `9` because the clock/reboot gates are
+intentionally not certified:
 
 - `append-rule --temporary` did not authorize the already-connected device.
 - `allow-device` authorized the device without changing persistent rules.
@@ -172,7 +179,7 @@ gates are intentionally not certified:
   `UNVERIFIED`.
 
 The retained VM evidence is
-`/var/tmp/usbguard-approval-manager-g01-c1d917b/g01-20261103T203827Z.p8GbPh`.
+`/var/tmp/usbguard-approval-manager-g01-769adf3/g01-20261103T204430Z.50x7hP`.
 
 The detailed evidence and exact limits are in
 [`g01-preflight-report.md`](./g01-preflight-report.md).
