@@ -105,4 +105,32 @@ set -e
 [[ "$status" -eq 7 ]] || fail "out-of-range TTL was accepted"
 pass "TTL limits are validated before planning"
 
+(
+  source "$PROJECT_ROOT/scripts/usb-approve.sh"
+  SELECTED_DEVICES=(3 4 5)
+  BATCH_FAILED=0
+  BATCH_UNCERTAIN=0
+  BATCH_AUDIT_FAILED=0
+  BATCH_SUCCEEDED=0
+  result_start
+
+  process_device() {
+    [[ "$1" == "3" ]] || fail "batch continued after an uncertain result"
+    result_add_item "$1" "$RESULT_RECOVERY_REQUIRED" "$EXIT_INCONSISTENT" \
+      "recovery required" unknown not_applicable
+    BATCH_UNCERTAIN=1
+  }
+
+  process_selected_devices
+  [[ "${#RESULT_ITEM_JSON[@]}" -eq 3 ]] ||
+    fail "batch results do not include unprocessed devices"
+  jq -e '.item_id == "4" and .policy_result.detail_code == "batch_stopped_for_recovery"' \
+    <<< "${RESULT_ITEM_JSON[1]}" >/dev/null ||
+    fail "unprocessed device was not marked as skipped"
+  jq -e '.item_id == "5" and .policy_result.detail_code == "batch_stopped_for_recovery"' \
+    <<< "${RESULT_ITEM_JSON[2]}" >/dev/null ||
+    fail "later unprocessed device was not marked as skipped"
+)
+pass "batch stops after an uncertain result and records remaining devices as skipped"
+
 printf 'All usb-approve checks passed\n'

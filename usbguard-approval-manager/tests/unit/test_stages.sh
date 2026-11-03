@@ -175,6 +175,22 @@ grep -Fqx 'allow-device 1' "$TEST_DIR/usbguard-commands.log" ||
   fail "temporary approval did not explicitly approve the connected device"
 pass "temporary transaction approves the connected device separately from adding its rule"
 
+# A permanent match must not be duplicated as a temporary TTL rule.
+printf 'allow id abcd:ef04\n' >> "$TEST_DIR/rules.conf"
+records_before="$(jq '.records | length' "$TTL_FILE")"
+if stages_approve_temporary 'allow id abcd:ef04' 3600 >/dev/null 2>&1; then
+  fail "temporary approval duplicated a persistent rule"
+fi
+[[ "$STAGES_ERROR_CODE" == "persistent_overlap" ]] ||
+  fail "persistent overlap returned an unexpected error code"
+[[ "$(jq '.records | length' "$TTL_FILE")" == "$records_before" ]] ||
+  fail "persistent overlap created a TTL record"
+if grep -Fqx 'append-rule --temporary allow id abcd:ef04' \
+  "$TEST_DIR/usbguard-commands.log"; then
+  fail "persistent overlap changed active policy"
+fi
+pass "persistent rules are rejected before creating TTL state or changing policy"
+
 # Test that pending leftover goes to recovery_required in reconcile simulation
 # Create a pending record manually
 pending_rec="$(stages_create_pending_record 'allow id 1111:2222' 9999999999)"

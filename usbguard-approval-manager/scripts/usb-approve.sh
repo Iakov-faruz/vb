@@ -278,6 +278,15 @@ result_add_failure() {
   fi
 }
 
+release_device_lock() {
+  if lock_release; then
+    return 0
+  fi
+  printf 'usb-approve: ERROR: unable to release the global lock\n' >&2
+  BATCH_UNCERTAIN=1
+  return 1
+}
+
 process_device() {
   local device_id="$1"
   local original_rule="${SELECTED_RULES[$device_id]}"
@@ -292,14 +301,14 @@ process_device() {
   if [[ -e "$RESTORE_JOURNAL_FILE" || -L "$RESTORE_JOURNAL_FILE" ]]; then
     result_add_failure "$device_id" "$EXIT_INCONSISTENT" \
       "restore journal requires recovery" "restore_recovery_required"
-    lock_release || true
+    release_device_lock || return 1
     return
   fi
 
   if ! list_blocked_devices; then
     result_add_failure "$device_id" "$EXIT_OPERATION" \
       "unable to re-fetch blocked devices under lock" "$USBAM_POLICY_ERROR_CODE"
-    lock_release || true
+    release_device_lock || return 1
     return
   fi
   for record in "${USBAM_BLOCKED_DEVICES[@]}"; do
@@ -313,7 +322,7 @@ process_device() {
   if [[ -z "$current_rule" || "$current_rule" != "$original_rule" ]]; then
     result_add_failure "$device_id" "$EXIT_VALIDATION" \
       "device disappeared or changed after selection; no policy was changed" "device_changed"
-    lock_release || true
+    release_device_lock || return 1
     return
   fi
 
@@ -321,7 +330,7 @@ process_device() {
     if ! output_file="$(mktemp)"; then
       result_add_failure "$device_id" "$EXIT_OPERATION" \
         "unable to reserve private stage output" "temporary_storage_unavailable"
-      lock_release || true
+      release_device_lock || return 1
       return
     fi
     if stages_approve_temporary \
@@ -332,17 +341,23 @@ process_device() {
         result_add_failure "$device_id" "$EXIT_INCONSISTENT" \
           "temporary approval completed but private output cleanup failed" \
           "temporary_storage_cleanup_failed"
-        lock_release || true
+        release_device_lock || return 1
         return
       fi
       :
     else
       rc=$?
-      rm -f -- "$output_file" || true
+      if ! rm -f -- "$output_file"; then
+        result_add_failure "$device_id" "$EXIT_INCONSISTENT" \
+          "temporary approval failed and private output cleanup failed" \
+          "temporary_storage_cleanup_failed"
+        release_device_lock || return 1
+        return
+      fi
       result_add_failure "$device_id" "$rc" \
         "temporary approval failed: ${STAGES_ERROR_CODE:-unknown}" \
         "${STAGES_ERROR_CODE:-temporary_approval_failed}"
-      lock_release || true
+      release_device_lock || return 1
       return
     fi
   else
@@ -354,7 +369,7 @@ process_device() {
       result_add_failure "$device_id" "$rc" \
         "permanent approval failed: ${STAGES_ERROR_CODE:-unknown}" \
         "${STAGES_ERROR_CODE:-permanent_approval_failed}"
-      lock_release || true
+      release_device_lock || return 1
       return
     fi
   fi
@@ -374,7 +389,7 @@ process_device() {
       "policy applied; Audit write failed" applied failed "" "audit_write_failed"
     BATCH_AUDIT_FAILED=1
   fi
-  lock_release || true
+  release_device_lock || return 1
 }
 
 confirm_approval() {
@@ -410,6 +425,24 @@ confirm_approval() {
   local answer
   read -r -p 'Type APPROVE to continue: ' answer || return 130
   [[ "$answer" == "APPROVE" ]]
+}
+
+process_selected_devices() {
+  local index device_id
+  for ((index = 0; index < ${#SELECTED_DEVICES[@]}; index++)); do
+    device_id="${SELECTED_DEVICES[$index]}"
+    process_device "$device_id"
+    if (( BATCH_UNCERTAIN )); then
+      for ((index++; index < ${#SELECTED_DEVICES[@]}; index++)); do
+        device_id="${SELECTED_DEVICES[$index]}"
+        result_add_item "$device_id" "$RESULT_OPERATION_FAILED" "$EXIT_OPERATION" \
+          "not processed because a previous device requires recovery" \
+          not_applied not_applicable "batch_stopped_for_recovery"
+        BATCH_FAILED=1
+      done
+      break
+    fi
+  done
 }
 
 main() {
@@ -482,24 +515,10 @@ main() {
     exit "$EXIT_CANCELLED"
   fi
 
-  local index
-  for ((index = 0; index < ${#SELECTED_DEVICES[@]}; index++)); do
-    device_id="${SELECTED_DEVICES[$index]}"
-    process_device "$device_id"
-    if (( BATCH_UNCERTAIN )); then
-      for ((index++; index < ${#SELECTED_DEVICES[@]}; index++)); do
-        device_id="${SELECTED_DEVICES[$index]}"
-        result_add_item "$device_id" "$RESULT_OPERATION_FAILED" "$EXIT_OPERATION" \
-          "not processed because a previous device requires recovery" \
-          not_applied not_applicable "batch_stopped_for_recovery"
-        BATCH_FAILED=1
-      done
-      break
-    fi
-  done
+  process_selected_devices
 
   if (( BATCH_UNCERTAIN )); then
-    result_recovery_required "one or more device outcomes require recovery"
+    result_recovery_required "one or more device outcomes or the global lock state require recovery"
   elif (( BATCH_AUDIT_FAILED )); then
     result_policy_applied_audit_failed "policy applied but one or more Audit writes failed"
   elif (( BATCH_FAILED )); then
@@ -519,4 +538,6 @@ main() {
   exit "$RESULT_EXIT_CODE"
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

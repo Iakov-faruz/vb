@@ -78,16 +78,16 @@ policy mutation. Each approval requires an explicit confirmation.
 
 ```bash
 # Temporary approval (default TTL comes from TEMP_TTL_SECONDS)
-sudo scripts/usb-approve.sh --device 3 --type temporary
+sudo bash scripts/usb-approve.sh --device 3 --type temporary
 
 # Temporary approval with an explicit TTL
-sudo scripts/usb-approve.sh --device 3 --type temporary --ttl 3600
+sudo bash scripts/usb-approve.sh --device 3 --type temporary --ttl 3600
 
 # Permanent approval
-sudo scripts/usb-approve.sh --device 3 --type permanent
+sudo bash scripts/usb-approve.sh --device 3 --type permanent
 
 # Batch approval: each device is processed and reported separately
-sudo scripts/usb-approve.sh --device 3 --device 4 --type temporary --ttl 3600
+sudo bash scripts/usb-approve.sh --device 3 --device 4 --type temporary --ttl 3600
 
 # Read-only plan; no policy, TTL, or Audit writes
 scripts/usb-approve.sh --device 3 --type temporary --ttl 3600 --dry-run
