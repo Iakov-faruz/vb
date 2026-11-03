@@ -812,6 +812,12 @@ add_permanent_rule() {
     return 1
   fi
 
+  if ! usbguard_rule_is_persistent "$rule"; then
+    usbguard_policy_error "permanent rule was not found in the configured persistent policy"
+    USBAM_POLICY_ERROR_CODE="persistence_verification_failed"
+    return 1
+  fi
+
   return 0
 }
 

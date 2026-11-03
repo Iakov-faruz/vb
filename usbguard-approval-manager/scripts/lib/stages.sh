@@ -283,10 +283,11 @@ _stages_approve_temporary() {
   local rule="$1"
   local ttl_seconds="$2"
   local correlation_id="${3:-}"
+  local device_id="${4:-}"
   local expires_at current_epoch
 
-  if (( $# < 2 || $# > 3 )); then
-    stages_error "stages_approve_temporary requires rule and ttl_seconds" "invalid_arguments"
+  if (( $# < 2 || $# > 4 )); then
+    stages_error "stages_approve_temporary requires rule, ttl_seconds, and optional device ID" "invalid_arguments"
     return 1
   fi
 
@@ -347,10 +348,12 @@ _stages_approve_temporary() {
     return 1
   fi
 
-  # Step 3: Perform USBGuard operations - approve device (if needed) + add temporary rule
-  # Note: approve_device requires device ID, not rule. For TTL flow, we only add temporary rule.
-  # The device approval is separate and should be done via usb-approve.sh which calls approve_device first.
-  # Here we implement the rule addition part.
+  # A live device and its future policy rule are separate USBGuard operations.
+  if [[ -n "$device_id" ]] && ! approve_device "$device_id"; then
+    stages_update_status "$managed_id" "recovery_required" "$TTL_FILE" || true
+    stages_error "device approval failed after TTL record creation" "device_approval_failed"
+    return 9
+  fi
 
   local canonical_rule
   canonical_rule="$(usbguard_canonicalize_rule "$rule")"
@@ -404,9 +407,10 @@ _stages_approve_temporary() {
 _stages_approve_permanent() {
   local rule="$1"
   local correlation_id="${2:-}"
+  local device_id="${3:-}"
 
-  if (( $# < 1 || $# > 2 )); then
-    stages_error "stages_approve_permanent requires rule" "invalid_arguments"
+  if (( $# < 1 || $# > 3 )); then
+    stages_error "stages_approve_permanent requires rule and optional device ID" "invalid_arguments"
     return 1
   fi
 
@@ -431,6 +435,12 @@ _stages_approve_permanent() {
   if ! add_permanent_rule "$canonical_rule"; then
     stages_error "failed to add permanent rule: $USBAM_POLICY_ERROR_CODE" "policy_failed"
     return 1
+  fi
+
+  if [[ -n "$device_id" ]] && ! approve_device "$device_id"; then
+    stages_error "permanent rule was added but device approval failed" \
+      "device_approval_failed_after_rule"
+    return 9
   fi
 
   # For permanent, we don't create TTL record, but we should audit

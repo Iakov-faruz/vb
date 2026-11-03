@@ -85,6 +85,44 @@ else
   preflight_incomplete=1
 fi
 
+# --- Quick diagnostic checks (clock time guard + USB device) ---
+
+parse_quick_result() {
+  local out="$1" line
+  line="$(printf '%s\n' "$out" | grep -E '^=== Result: [0-9]+ pass, [0-9]+ fail ===' || true)"
+  if [[ "$line" =~ ===\ Result:\ ([0-9]+)\ pass,\ ([0-9]+)\ fail\ === ]]; then
+    printf '%s %s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+  else
+    printf '0 0\n'
+  fi
+}
+
+if [[ -f "$PROJECT_ROOT/tests/quick/clock_time_check.sh" ]]; then
+  clock_out="$(bash "$PROJECT_ROOT/tests/quick/clock_time_check.sh" 2>&1)" || clock_rc=$?
+  clock_rc="${clock_rc:-0}"
+  read -r clock_pass clock_fail < <(parse_quick_result "$clock_out")
+  printf 'CLOCK_CHECK_RC=%s\n' "$clock_rc"
+  printf 'CLOCK_CHECK_PASS=%s\n' "$clock_pass"
+  printf 'CLOCK_CHECK_FAIL=%s\n' "$clock_fail"
+else
+  printf 'CLOCK_CHECK_RC=127\n'
+  printf 'CLOCK_CHECK_PASS=0\n'
+  printf 'CLOCK_CHECK_FAIL=0\n'
+fi
+
+if [[ -f "$PROJECT_ROOT/tests/quick/usb_device_check.sh" ]]; then
+  usb_out="$(USBAM_TEST_USB_ID="${USBAM_TEST_USB_ID:-048d:1234}" bash "$PROJECT_ROOT/tests/quick/usb_device_check.sh" 2>&1)" || usb_rc=$?
+  usb_rc="${usb_rc:-0}"
+  read -r usb_pass usb_fail < <(parse_quick_result "$usb_out")
+  printf 'USB_CHECK_RC=%s\n' "$usb_rc"
+  printf 'USB_CHECK_PASS=%s\n' "$usb_pass"
+  printf 'USB_CHECK_FAIL=%s\n' "$usb_fail"
+else
+  printf 'USB_CHECK_RC=127\n'
+  printf 'USB_CHECK_PASS=0\n'
+  printf 'USB_CHECK_FAIL=0\n'
+fi
+
 if (( preflight_incomplete )); then
   printf 'T01_RESULT=UNVERIFIED\n'
 else

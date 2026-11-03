@@ -69,6 +69,12 @@ sudo env USBAM_TEST_USB_ID=048d:1234 bash tests/quick/usb_device_check.sh
 sudo bash tests/quick/clock_time_check.sh
 ```
 
+`scripts/usbguard-status.sh --json` provides the versioned monitoring
+contract (`schema_version: 1`), with daemon/IPC/timer health, TTL state counts,
+and separate policy and Audit result objects. It is read-only and reports an
+open restore journal as `service_status=degraded` with
+`detail_code=restore_recovery_required`.
+
 The G-01 integration wrapper is not a status-only check: it changes the
 selected USB's kernel authorization in the isolated lab. It requires explicit
 hostname, device-ID, write, and confirmation values and refuses to stop or
