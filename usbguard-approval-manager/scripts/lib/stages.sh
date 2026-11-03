@@ -495,6 +495,108 @@ _stages_approve_permanent() {
   return 0
 }
 
+_stages_import_temporary() {
+  local rule="$1"
+  local expires_at="$2"
+  local canonical_rule current_epoch has_records pending_record managed_id
+  local active_id active_rule line
+
+  if (( $# != 2 )) || [[ ! "$expires_at" =~ ^[0-9]+$ ]] || (( expires_at <= 0 )); then
+    stages_error "stages_import_temporary requires a rule and positive absolute expiry" \
+      "invalid_arguments"
+    return 1
+  fi
+  if [[ -f "$RESTORE_JOURNAL_FILE" || -L "$RESTORE_JOURNAL_FILE" ]]; then
+    stages_error "restore journal exists, recovery required before any policy change" \
+      "restore_journal_exists"
+    return 9
+  fi
+  if ! is_g01_verified; then
+    stages_error "G-01 verification is required before policy changes" "g01_not_verified"
+    return 7
+  fi
+  if ! validate_ttl_json "$TTL_FILE"; then
+    stages_error "ttl.json is invalid; recovery is required before policy changes" "existing_invalid"
+    return 9
+  fi
+  if ! usbguard_validate_rule "$rule"; then
+    stages_error "invalid imported temporary rule" "invalid_rule"
+    return 1
+  fi
+  canonical_rule="$(usbguard_canonicalize_rule "$rule")"
+  if ! usbguard_check_precedence "$canonical_rule"; then
+    stages_error "precedence conflict for imported rule" "precedence_conflict"
+    return 7
+  fi
+  for line in "${USBAM_ACTIVE_RULES[@]}"; do
+    if usbguard_parse_rule_line "$line" active_id active_rule &&
+      [[ "$active_rule" == "$canonical_rule" ]]; then
+      stages_error "matching rule already exists in active policy" "duplicate_rule"
+      return 7
+    fi
+  done
+  if usbguard_rule_is_persistent "$canonical_rule"; then
+    stages_error "matching permanent rule already exists; TTL would be redundant" \
+      "persistent_overlap"
+    return 7
+  else
+    local persistent_check_status=$?
+    if (( persistent_check_status != 1 )); then
+      stages_error "persistent policy could not be checked safely" \
+        "${USBAM_POLICY_ERROR_CODE:-persistent_policy_unavailable}"
+      return 9
+    fi
+  fi
+  has_records="$(has_non_expired_records "$TTL_FILE")"
+  if ! detect_clock_jump "$CLOCK_STATE_FILE" "$has_records"; then
+    stages_error "clock not trusted, cannot import TTL record: $CLOCK_TRUST_STATUS" \
+      "clock_untrusted"
+    return 9
+  fi
+  if ! current_epoch="$(date +%s)" || (( expires_at <= current_epoch )); then
+    stages_error "imported TTL has expired or the current clock is unavailable" \
+      "expired_import"
+    return 1
+  fi
+
+  if ! pending_record="$(stages_create_pending_record "$canonical_rule" "$expires_at")"; then
+    return 1
+  fi
+  managed_id="$(printf '%s' "$pending_record" | jq -r '.managed_id // empty')"
+  if [[ -z "$managed_id" ]]; then
+    managed_id="$USBAM_LAST_MANAGED_ID"
+  fi
+  if [[ ! "$managed_id" =~ ^[0-9a-fA-F-]{36}$ ]] ||
+    ! stages_add_record "$pending_record" "$TTL_FILE"; then
+    stages_error "unable to persist imported pending TTL record" "atomic_write_failed"
+    return 9
+  fi
+  if ! add_temporary_rule "$canonical_rule"; then
+    local policy_error="$USBAM_POLICY_ERROR_CODE"
+    if usbguard_find_rule_id_by_canonical "$canonical_rule" >/dev/null 2>&1; then
+      stages_update_status "$managed_id" "inconsistent" "$TTL_FILE" || true
+      stages_error "imported temporary rule outcome is uncertain" "inconsistent_state"
+      return 9
+    fi
+    if ! stages_update_status "$managed_id" "recovery_required" "$TTL_FILE"; then
+      stages_error "failed rule addition and TTL recovery marker write" "atomic_write_failed"
+      return 9
+    fi
+    stages_error "failed to add imported temporary rule: $policy_error" "policy_failed"
+    return 1
+  fi
+  if ! usbguard_find_rule_id_by_canonical "$canonical_rule" >/dev/null; then
+    stages_update_status "$managed_id" "inconsistent" "$TTL_FILE" || true
+    stages_error "imported temporary rule was not found after addition" "verification_failed"
+    return 9
+  fi
+  if ! stages_update_status "$managed_id" "active" "$TTL_FILE"; then
+    stages_error "imported policy applied but TTL activation failed" "atomic_write_failed"
+    return 9
+  fi
+  printf '%s\n' "$managed_id"
+}
+
 stages_init_ttl_file_if_missing() {
   stages_run_locked _stages_init_ttl_file_if_missing "$@"
 }
@@ -513,4 +615,8 @@ stages_approve_temporary() {
 
 stages_approve_permanent() {
   stages_run_locked _stages_approve_permanent "$@"
+}
+
+stages_import_temporary() {
+  stages_run_locked _stages_import_temporary "$@"
 }

@@ -133,4 +133,89 @@ pass "TTL limits are validated before planning"
 )
 pass "batch stops after an uncertain result and records remaining devices as skipped"
 
+(
+  source "$PROJECT_ROOT/scripts/usb-approve.sh"
+  APPROVAL_TYPE=temporary
+  SELECTED_DEVICES=(3 4 5)
+  SELECTED_RULES=(
+    [3]="allow id 1111:2222"
+    [4]="allow id abcd:ef04"
+    [5]="allow id abcd:ef05"
+  )
+
+  list_active_rules() {
+    USBAM_ACTIVE_RULES=('1: block id 1111:2222')
+  }
+  usbguard_rule_is_persistent() {
+    [[ "$1" == "allow id abcd:ef05" ]]
+  }
+
+  preflight_selected_devices
+  [[ "${SELECTED_BLOCK_REASONS[3]}" == "precedence_conflict" ]] ||
+    fail "preflight missed block-before-allow precedence"
+  [[ -z "${SELECTED_BLOCK_REASONS[4]}" ]] ||
+    fail "preflight blocked a rule without a conflict"
+  [[ "${SELECTED_BLOCK_REASONS[5]}" == "persistent_overlap" ]] ||
+    fail "preflight missed persistent overlap"
+
+  summary="$(approval_summary)"
+  [[ "$summary" == *"earlier block/reject rule takes precedence"* ]] ||
+    fail "approval summary omitted precedence warning"
+  [[ "$summary" == *"matching permanent rule exists"* ]] ||
+    fail "approval summary omitted persistent overlap warning"
+
+  BATCH_FAILED=0
+  BATCH_UNCERTAIN=0
+  BATCH_AUDIT_FAILED=0
+  BATCH_SUCCEEDED=0
+  BATCH_FAILURE_RC=0
+  result_start
+  process_device() {
+    [[ "$1" == "4" ]] || fail "preflight-blocked device reached policy processing"
+    result_add_item "$1" "$RESULT_SUCCESS" "$EXIT_OK" \
+      "approval verified" applied written
+    BATCH_SUCCEEDED=$((BATCH_SUCCEEDED + 1))
+  }
+  process_selected_devices
+  [[ "$BATCH_SUCCEEDED" -eq 1 && "$BATCH_FAILED" -eq 1 ]] ||
+    fail "preflight batch did not preserve eligible approvals"
+  [[ "${#RESULT_ITEM_JSON[@]}" -eq 3 ]] ||
+    fail "preflight batch omitted a selected device result"
+)
+pass "approval preflight warns on precedence and persistent overlap while preserving eligible batch items"
+
+(
+  source "$PROJECT_ROOT/scripts/usb-approve.sh"
+  result_start
+  BATCH_UNCERTAIN=0
+  BATCH_AUDIT_FAILED=0
+  BATCH_FAILED=1
+  BATCH_SUCCEEDED=1
+  BATCH_FAILURE_RC=7
+  finalize_batch_result
+  [[ "$RESULT_EXIT_CODE" -eq "$EXIT_PARTIAL" ]] ||
+    fail "mixed success/failure batch did not return EXIT_PARTIAL"
+  [[ "$RESULT_STATE" == "$RESULT_PARTIAL" ]] ||
+    fail "mixed success/failure batch has the wrong result state"
+
+  result_start
+  BATCH_UNCERTAIN=0
+  BATCH_AUDIT_FAILED=1
+  BATCH_FAILED=1
+  BATCH_SUCCEEDED=1
+  finalize_batch_result
+  [[ "$RESULT_EXIT_CODE" -eq "$EXIT_AUDIT" ]] ||
+    fail "Audit failure did not take priority over partial failure"
+
+  result_start
+  BATCH_UNCERTAIN=1
+  BATCH_AUDIT_FAILED=1
+  BATCH_FAILED=1
+  BATCH_SUCCEEDED=1
+  finalize_batch_result
+  [[ "$RESULT_EXIT_CODE" -eq "$EXIT_INCONSISTENT" ]] ||
+    fail "uncertain outcome did not take priority over Audit failure"
+)
+pass "batch exit-code precedence follows recovery, Audit, and partial-result priority"
+
 printf 'All usb-approve checks passed\n'

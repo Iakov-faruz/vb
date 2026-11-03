@@ -36,6 +36,7 @@ declare -a REQUESTED_DEVICES=()
 declare -a SELECTED_DEVICES=()
 declare -A SELECTED_RULES=()
 declare -A SEEN_DEVICES=()
+declare -A SELECTED_BLOCK_REASONS=()
 
 usage() {
   cat <<EOF
@@ -241,6 +242,83 @@ check_selected_ids() {
   done
 }
 
+preflight_selected_devices() {
+  local device_id rule line rule_id active_rule persistent_status
+  SELECTED_BLOCK_REASONS=()
+
+  if ! list_active_rules; then
+    operation_error "unable to inspect active USBGuard rules before approval"
+  fi
+
+  for device_id in "${SELECTED_DEVICES[@]}"; do
+    rule="${SELECTED_RULES[$device_id]}"
+    local block_reason=""
+
+    for line in "${USBAM_ACTIVE_RULES[@]}"; do
+      if usbguard_parse_rule_line "$line" rule_id active_rule &&
+        [[ "$active_rule" == "$rule" ]]; then
+        block_reason="duplicate_rule"
+        break
+      fi
+    done
+
+    if [[ -z "$block_reason" ]]; then
+      USBAM_POLICY_ERROR_CODE=""
+      if ! usbguard_check_precedence "$rule"; then
+        if [[ "$USBAM_POLICY_ERROR_CODE" == "precedence_conflict" ]]; then
+          block_reason="precedence_conflict"
+        else
+          operation_error "unable to verify rule precedence for device $device_id"
+        fi
+      fi
+    fi
+
+    if [[ -z "$block_reason" ]]; then
+      USBAM_POLICY_ERROR_CODE=""
+      if usbguard_rule_is_persistent "$rule"; then
+        if [[ "$APPROVAL_TYPE" == "temporary" ]]; then
+          block_reason="persistent_overlap"
+        else
+          block_reason="persistent_duplicate"
+        fi
+      else
+        persistent_status=$?
+        if (( persistent_status != 1 )); then
+          operation_error "unable to inspect persistent policy for device $device_id"
+        fi
+      fi
+    fi
+
+    SELECTED_BLOCK_REASONS["$device_id"]="$block_reason"
+  done
+}
+
+approval_block_message() {
+  case "$1" in
+    duplicate_rule) printf 'matching rule already exists in active policy' ;;
+    precedence_conflict) printf 'an earlier block/reject rule takes precedence' ;;
+    persistent_overlap) printf 'matching permanent rule exists; temporary TTL would be redundant' ;;
+    persistent_duplicate) printf 'matching rule already exists in persistent policy' ;;
+    *) printf 'approval was rejected by policy preflight' ;;
+  esac
+}
+
+approval_summary() {
+  local device_id
+  local summary="Review the approval plan. Devices with policy warnings will be skipped."
+  summary+=$'\n\n'"Type: $APPROVAL_TYPE"
+  if [[ "$APPROVAL_TYPE" == "temporary" ]]; then
+    summary+=$'\n'"TTL: $TTL_SECONDS seconds"
+  fi
+  for device_id in "${SELECTED_DEVICES[@]}"; do
+    summary+=$'\n\n'"Device $device_id"$'\n'"${SELECTED_RULES[$device_id]}"
+    if [[ -n "${SELECTED_BLOCK_REASONS[$device_id]:-}" ]]; then
+      summary+=$'\n'"WARNING: $(approval_block_message "${SELECTED_BLOCK_REASONS[$device_id]}") — this device will not be changed."
+    fi
+  done
+  printf '%s' "$summary"
+}
+
 result_add_failure() {
   local device_id="$1"
   local exit_code="$2"
@@ -393,7 +471,6 @@ process_device() {
 }
 
 confirm_approval() {
-  local device_id
   if (( DRY_RUN )); then
     return 0
   fi
@@ -402,26 +479,13 @@ confirm_approval() {
   fi
 
   if command -v whiptail >/dev/null 2>&1; then
-    local summary="Approve the selected devices?"
-    for device_id in "${SELECTED_DEVICES[@]}"; do
-      summary+=$'\n\n'"Device $device_id"$'\n'"${SELECTED_RULES[$device_id]}"
-    done
-    summary+=$'\n\n'"Type: $APPROVAL_TYPE"
-    if [[ "$APPROVAL_TYPE" == "temporary" ]]; then
-      summary+=$'\n'"TTL: $TTL_SECONDS seconds"
-    fi
+    local summary
+    summary="$(approval_summary)"
     whiptail --title "Confirm USBGuard approval" --yesno "$summary" 20 78
     return $?
   fi
 
-  printf 'Approval plan:\n'
-  printf '  Type: %s\n' "$APPROVAL_TYPE"
-  if [[ "$APPROVAL_TYPE" == "temporary" ]]; then
-    printf '  TTL: %s seconds\n' "$TTL_SECONDS"
-  fi
-  for device_id in "${SELECTED_DEVICES[@]}"; do
-    printf '  Device %s: %s\n' "$device_id" "${SELECTED_RULES[$device_id]}"
-  done
+  printf '%s\n' "$(approval_summary)"
   local answer
   read -r -p 'Type APPROVE to continue: ' answer || return 130
   [[ "$answer" == "APPROVE" ]]
@@ -431,6 +495,12 @@ process_selected_devices() {
   local index device_id
   for ((index = 0; index < ${#SELECTED_DEVICES[@]}; index++)); do
     device_id="${SELECTED_DEVICES[$index]}"
+    if [[ -n "${SELECTED_BLOCK_REASONS[$device_id]:-}" ]]; then
+      result_add_failure "$device_id" "$EXIT_VALIDATION" \
+        "$(approval_block_message "${SELECTED_BLOCK_REASONS[$device_id]}")" \
+        "${SELECTED_BLOCK_REASONS[$device_id]}"
+      continue
+    fi
     process_device "$device_id"
     if (( BATCH_UNCERTAIN )); then
       for ((index++; index < ${#SELECTED_DEVICES[@]}; index++)); do
@@ -443,6 +513,26 @@ process_selected_devices() {
       break
     fi
   done
+}
+
+finalize_batch_result() {
+  if (( BATCH_UNCERTAIN )); then
+    result_recovery_required "one or more device outcomes or the global lock state require recovery"
+  elif (( BATCH_AUDIT_FAILED )); then
+    result_policy_applied_audit_failed "policy applied but one or more Audit writes failed"
+  elif (( BATCH_FAILED )); then
+    if (( BATCH_SUCCEEDED > 0 )); then
+      result_partial "one or more batch items failed" unknown not_applicable
+    elif (( BATCH_FAILURE_RC == EXIT_VALIDATION )); then
+      result_validation_failed "approval was rejected before policy change"
+    else
+      result_operation_failed "approval failed"
+    fi
+  else
+    result_success "all selected approvals completed"
+    RESULT_POLICY_STATUS="applied"
+    RESULT_AUDIT_STATUS="written"
+  fi
 }
 
 main() {
@@ -501,6 +591,7 @@ main() {
     result_print_json
     exit "$EXIT_INCONSISTENT"
   fi
+  preflight_selected_devices
   RESULT_CORRELATION_ID="$(generate_uuid_v4)"
   if ! validators_is_uuid_v4 "$RESULT_CORRELATION_ID"; then
     operation_error "unable to generate a valid correlation ID"
@@ -516,24 +607,7 @@ main() {
   fi
 
   process_selected_devices
-
-  if (( BATCH_UNCERTAIN )); then
-    result_recovery_required "one or more device outcomes or the global lock state require recovery"
-  elif (( BATCH_AUDIT_FAILED )); then
-    result_policy_applied_audit_failed "policy applied but one or more Audit writes failed"
-  elif (( BATCH_FAILED )); then
-    if (( BATCH_SUCCEEDED > 0 )); then
-      result_partial "one or more batch items failed" unknown not_applicable
-    elif (( BATCH_FAILURE_RC == EXIT_VALIDATION )); then
-      result_validation_failed "approval was rejected before policy change"
-    else
-      result_operation_failed "approval failed"
-    fi
-  else
-    result_success "all selected approvals completed"
-    RESULT_POLICY_STATUS="applied"
-    RESULT_AUDIT_STATUS="written"
-  fi
+  finalize_batch_result
   result_print_json
   exit "$RESULT_EXIT_CODE"
 }

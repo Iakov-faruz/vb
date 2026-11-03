@@ -5,6 +5,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$SCRIPT_DIR/lib"
+STATUS_SCRIPT="$SCRIPT_DIR/$(basename -- "${BASH_SOURCE[0]}")"
 
 # shellcheck source=/dev/null
 source "$LIB_DIR/config-reader.sh"
@@ -18,14 +19,63 @@ STATE_DIR="${USBAM_STATE_DIR:-/var/lib/usbguard-approval-manager}"
 TTL_FILE="${USBAM_TTL_FILE:-$STATE_DIR/ttl.json}"
 RESTORE_JOURNAL_FILE="${USBAM_RESTORE_JOURNAL_FILE:-$STATE_DIR/restore_journal.json}"
 TIMER_UNIT="${USBAM_TIMER_UNIT:-usbguard-approval-manager.timer}"
+WATCH=0
+WATCH_INTERVAL=5
+JSON_MODE=0
 
 usage() {
-  printf 'Usage: %s --json\n' "$0"
+  printf 'Usage: %s --json | --watch [SECONDS] | --help\n' "$0"
 }
 
-if (( $# != 1 )) || [[ "$1" != "--json" ]]; then
+while (( $# )); do
+  case "$1" in
+    --json)
+      JSON_MODE=1
+      shift
+      ;;
+    --watch)
+      WATCH=1
+      shift
+      if (( $# )) && [[ "$1" =~ ^[0-9]+$ ]]; then
+        WATCH_INTERVAL="$1"
+        shift
+      fi
+      ;;
+    --help)
+      usage
+      exit 0
+      ;;
+    *)
+      usage >&2
+      exit 7
+      ;;
+  esac
+done
+
+if (( 10#$WATCH_INTERVAL < 1 || 10#$WATCH_INTERVAL > 3600 )); then
+  printf 'usbguard-status: ERROR: watch interval must be between 1 and 3600 seconds\n' >&2
+  exit 7
+fi
+if (( JSON_MODE == 0 && WATCH == 0 )); then
   usage >&2
   exit 7
+fi
+
+if (( WATCH )); then
+  while :; do
+    if ! status_output="$(bash "$STATUS_SCRIPT" --json)"; then
+      printf 'usbguard-status: ERROR: status query failed during watch\n' >&2
+      exit 1
+    fi
+    if ! jq -ce . <<< "$status_output"; then
+      printf 'usbguard-status: ERROR: status query returned invalid JSON during watch\n' >&2
+      exit 1
+    fi
+    if ! sleep "$WATCH_INTERVAL"; then
+      printf 'usbguard-status: ERROR: watch interval wait failed\n' >&2
+      exit 1
+    fi
+  done
 fi
 
 service_status="unknown"
@@ -44,8 +94,11 @@ declare -A ttl_counts=(
   [expired]=0
 )
 
-if [[ -f "$CONFIG_PATH" ]] && ! load_config "$CONFIG_PATH"; then
-  detail_code="invalid_config"
+if [[ -e "$CONFIG_PATH" || -L "$CONFIG_PATH" ]]; then
+  if [[ -L "$CONFIG_PATH" || ! -f "$CONFIG_PATH" || ! -r "$CONFIG_PATH" ]] ||
+    ! load_config "$CONFIG_PATH"; then
+    detail_code="invalid_config"
+  fi
 fi
 
 if check_daemon_status; then

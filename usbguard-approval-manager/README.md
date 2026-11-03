@@ -69,6 +69,16 @@ sudo env USBAM_TEST_USB_ID=048d:1234 bash tests/quick/usb_device_check.sh
 sudo bash tests/quick/clock_time_check.sh
 ```
 
+For monitoring, `usbguard-status.sh --json` writes one versioned status
+document. `--watch [SECONDS]` emits compact newline-delimited JSON snapshots
+(default interval: 5 seconds; valid range: 1-3600), suitable for terminal or
+pipe consumers:
+
+```bash
+bash scripts/usbguard-status.sh --json
+bash scripts/usbguard-status.sh --watch 10
+```
+
 ## Approving USB devices
 
 `scripts/usb-approve.sh` is the interactive and batch entry point. It fetches
@@ -94,6 +104,9 @@ scripts/usb-approve.sh --device 3 --type temporary --ttl 3600 --dry-run
 ```
 
 Omit `--device` to select blocked devices through the `whiptail` interface.
+The confirmation screen includes preflight warnings for existing precedence,
+duplicate, or persistent-rule conflicts; conflicting batch items are skipped
+and reported individually while eligible items may continue.
 Temporary approvals separately run `allow-device` for the currently connected
 device and add a TTL policy rule for future matching devices. Permanent
 approvals add and verify the persistent rule and separately allow the
@@ -123,6 +136,42 @@ Audit writes require the protected `/var/log/usbguard-approval-manager`
 directory owned by `root:usbadmins` with mode `0750`; the Audit file is
 `root:usbadmins` mode `0640`. The logger reports write failures to its caller,
 which must preserve any already-applied policy result.
+
+## Backup, restore, and policy exchange
+
+Phase 5 provides validated JSON exchange and private `tar.gz` backups:
+
+```bash
+bash scripts/export-rules.sh > export.json
+sudo bash scripts/import-rules.sh --file export.json
+sudo bash scripts/backup-rules.sh
+sudo bash scripts/restore-rules.sh --backup /var/backups/usbguard-approval-manager/backup.tar.gz
+sudo bash scripts/restore-rules.sh --recover
+```
+
+Exports contain only validated permanent `allow` rules from non-system policy
+sources and active TTL rules. Import validates the complete schema in a private
+staging directory, displays a diff, requires an interactive confirmation, then
+rechecks policy and TTL state under the global lock. Expired TTL entries are
+reported as `SKIPPED - expired`; imported TTL entries receive new managed and
+correlation IDs. All policy writes remain gated by the G-01 evidence marker.
+
+Backups include the application configuration, TTL state, and approved export
+only. Their manifest has a closed payload allowlist, byte sizes, modes, and
+SHA-256 digests; backup files are private and rotated according to
+`BACKUP_KEEP`. Archives are validated before extraction; absolute paths,
+traversal, links, unexpected members, and integrity mismatches are rejected.
+
+Restore is deliberately restricted to a configured `RuleFile`; if `RuleFolder`
+is configured, it must contain no non-system files. The daemon must be proven
+stopped, G-01 must be verified, and an interactive diff must be approved before
+the transaction writes anything. Files are staged and atomically replaced
+under the lock, with durable rollback copies and a journal. If the journal
+exists, policy/state mutations remain blocked until `restore-rules.sh
+--recover` verifies and restores the previous files. Restored non-expired TTL
+records are marked `recovery_required`; restore never reapplies a temporary
+rule or approves/blocks a device. These restrictions avoid replacing an
+unmanaged policy source or letting USBGuard consume a mixed policy set.
 
 `time-guards.sh` does not set or adjust the system clock. Its unit tests use
 simulated provider evidence and clock samples; they do not prove that a real

@@ -49,6 +49,11 @@ if [[ "${USBAM_TEST_TIMER_ACTIVE:-0}" == "1" ]]; then
 fi
 exit 3
 EOF
+cat > "$TEST_DIR/bin/sleep" <<'EOF'
+#!/usr/bin/env bash
+[[ "$*" == "1" || "$*" == "08" ]] || exit 2
+exit 1
+EOF
 chmod +x "$TEST_DIR/bin/"*
 
 fail() {
@@ -61,8 +66,23 @@ pass() {
 }
 
 run_status() {
-  bash "$PROJECT_ROOT/scripts/usbguard-status.sh" --json
+  if (( $# == 0 )); then
+    set -- --json
+  fi
+  bash "$PROJECT_ROOT/scripts/usbguard-status.sh" "$@"
 }
+
+if ! bash "$PROJECT_ROOT/scripts/usbguard-status.sh" --help >/dev/null; then
+  fail "help failed"
+fi
+pass "provides command help"
+
+if bash "$PROJECT_ROOT/scripts/usbguard-status.sh" --watch 0 >/dev/null 2>&1; then
+  fail "zero watch interval was accepted"
+else
+  [[ $? == 7 ]] || fail "invalid watch interval did not return EXIT_VALIDATION"
+fi
+pass "rejects invalid watch intervals"
 
 output="$(run_status)"
 jq -e '
@@ -136,6 +156,35 @@ jq -e '
   .detail_code == "restore_recovery_required"
 ' <<< "$output" >/dev/null || fail "restore journal did not degrade service status"
 pass "reports open restore journal as degraded"
+
+rm -f "$USBAM_RESTORE_JOURNAL_FILE"
+set +e
+watch_output="$(run_status --watch 1 2>/dev/null)"
+watch_status=$?
+set -e
+[[ "$watch_status" -eq 1 ]] || fail "watch did not surface a failed wait"
+[[ "$(wc -l <<< "$watch_output")" -eq 1 ]] ||
+  fail "watch output is not one compact JSON document per line"
+jq -e '.schema_version == 1' <<< "$watch_output" >/dev/null ||
+  fail "watch did not emit the status JSON contract"
+pass "watch mode streams compact JSON and reports polling failures"
+
+set +e
+watch_output="$(run_status --watch 08 2>/dev/null)"
+watch_status=$?
+set -e
+[[ "$watch_status" -eq 1 ]] || fail "watch interval with a leading zero was rejected"
+[[ "$(wc -l <<< "$watch_output")" -eq 1 ]] ||
+  fail "watch interval with a leading zero did not emit status"
+pass "watch interval parsing treats decimal values with leading zeroes correctly"
+
+printf 'TEMP_TTL_SECONDS=invalid\n' > "$USBAM_CONFIG_PATH"
+output="$(run_status --json)"
+jq -e '
+  .service_status == "degraded" and
+  .detail_code == "invalid_config"
+' <<< "$output" >/dev/null || fail "invalid configuration was not surfaced"
+pass "reports invalid configuration as degraded"
 
 if bash "$PROJECT_ROOT/scripts/usbguard-status.sh" --unexpected >/dev/null 2>&1; then
   fail "unknown arguments were accepted"
