@@ -13,6 +13,7 @@ from pathlib import Path
 
 FILE_MODE = 0o600
 TEMP_ATTEMPTS = 10
+MAX_JSON_SIZE = 1 * 1024 * 1024  # 1 MiB
 
 
 class AtomicWriteError(Exception):
@@ -27,6 +28,15 @@ def _reject_json_constant(value: str) -> None:
     raise ValueError(f"invalid JSON constant: {value}")
 
 
+def write_all(fd: int, payload: bytes) -> None:
+    view = memoryview(payload)
+    while view:
+        written = os.write(fd, view)
+        if written <= 0:
+            raise OSError("failed to complete file write")
+        view = view[written:]
+
+
 def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
     result: dict[str, object] = {}
     for key, value in pairs:
@@ -34,6 +44,24 @@ def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]
             raise ValueError(f"duplicate JSON key: {key}")
         result[key] = value
     return result
+
+
+def validate_json_document(document: str) -> None:
+    """Validate JSON syntax, reject non-standard constants, and reject duplicate keys."""
+    try:
+        encoded = document.encode("utf-8")
+    except UnicodeEncodeError as error:
+        raise AtomicWriteError("input contains invalid Unicode text") from error
+    if len(encoded) > MAX_JSON_SIZE:
+        raise AtomicWriteError(f"input exceeds maximum JSON size of {MAX_JSON_SIZE} bytes")
+    try:
+        json.loads(
+            document,
+            parse_constant=_reject_json_constant,
+            object_pairs_hook=_reject_duplicate_keys,
+        )
+    except (json.JSONDecodeError, ValueError) as error:
+        raise AtomicWriteError(f"input is not valid JSON: {error}") from error
 
 
 def _create_temp_file(directory_fd: int, target_name: str) -> tuple[int, str]:
@@ -64,14 +92,7 @@ def _create_temp_file(directory_fd: int, target_name: str) -> tuple[int, str]:
 
 def atomic_write_json(target_path: str | os.PathLike[str], document: str) -> None:
     """Validate and atomically replace target_path with the provided JSON."""
-    try:
-        json.loads(
-            document,
-            parse_constant=_reject_json_constant,
-            object_pairs_hook=_reject_duplicate_keys,
-        )
-    except (json.JSONDecodeError, ValueError) as error:
-        raise AtomicWriteError(f"input is not valid JSON: {error}") from error
+    validate_json_document(document)
     try:
         payload = document.encode("utf-8")
     except UnicodeEncodeError as error:
@@ -107,10 +128,11 @@ def atomic_write_json(target_path: str | os.PathLike[str], document: str) -> Non
                 raise AtomicWriteError("target is not a regular file")
 
         file_fd, temp_name = _create_temp_file(directory_fd, target.name)
-        with os.fdopen(file_fd, "wb") as target_file:
-            target_file.write(payload)
-            target_file.flush()
-            os.fsync(target_file.fileno())
+        try:
+            write_all(file_fd, payload)
+            os.fsync(file_fd)
+        finally:
+            os.close(file_fd)
 
         # Rename by directory descriptor, avoiding a second path lookup.
         os.replace(
@@ -147,16 +169,58 @@ def atomic_write_json(target_path: str | os.PathLike[str], document: str) -> Non
 
 
 def _parse_args(arguments: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Atomically write a validated JSON document."
-    )
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--file", required=True, help="target file path")
-    parser.add_argument("--data", required=True, help="JSON document to write")
+    parser.add_argument("--data", help="JSON document to write")
+    parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="validate the existing file without modifying it",
+    )
     return parser.parse_args(arguments)
 
 
 def main(arguments: list[str] | None = None) -> int:
     options = _parse_args(sys.argv[1:] if arguments is None else arguments)
+    if options.validate_only:
+        if options.data is not None:
+            print(
+                "atomic-write: ERROR: --data cannot be used with --validate-only",
+                file=sys.stderr,
+            )
+            return 2
+        try:
+            file_fd = os.open(
+                options.file,
+                os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+            )
+        except OSError as error:
+            print(f"atomic-write: ERROR: {error}", file=sys.stderr)
+            return 1
+        try:
+            file_stat = os.fstat(file_fd)
+            if not stat.S_ISREG(file_stat.st_mode):
+                print("atomic-write: ERROR: target is not a regular file", file=sys.stderr)
+                return 1
+            raw = os.read(file_fd, MAX_JSON_SIZE + 1)
+            if len(raw) > MAX_JSON_SIZE:
+                print("atomic-write: ERROR: input exceeds maximum JSON size", file=sys.stderr)
+                return 1
+            try:
+                document = raw.decode("utf-8")
+            except UnicodeDecodeError as error:
+                print(f"atomic-write: ERROR: {error}", file=sys.stderr)
+                return 1
+            validate_json_document(document)
+        except (OSError, AtomicWriteError) as error:
+            print(f"atomic-write: ERROR: {error}", file=sys.stderr)
+            return 1
+        finally:
+            os.close(file_fd)
+        return 0
+    if options.data is None:
+        print("atomic-write: ERROR: --data is required unless using --validate-only", file=sys.stderr)
+        return 2
     try:
         atomic_write_json(options.file, options.data)
     except AtomicWriteError as error:

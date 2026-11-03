@@ -214,7 +214,29 @@ restart persistence were verified, but no OS reboot or clock-jump recovery
 test was run. No production service was enabled or started, and no installed
 policy file was changed.
 
-Do not enable production writes or begin TTL/Reaper work until the clock source
-and threshold are approved, reboot recovery is exercised, and the independent
-recovery route is verified. Further live policy tests must remain limited to
-the documented isolated procedure with a temporary daemon and policy.
+Do not enable production writes or run TTL/Reaper against a live policy until
+the clock source and threshold are approved, reboot recovery is exercised, and
+the independent recovery route is verified. Further live policy tests must
+remain limited to the documented isolated procedure with a temporary daemon
+and policy.
+
+## Latest post-reboot clock review
+
+The user restarted the VM and a read-only review of the previous-boot clock
+journal found adjustments of approximately `+1.754784`, `+10.526829`, and
+`-0.166481` seconds. At the time of review, `ntpsec` was active,
+`timedatectl` reported `NTPSynchronized=yes`, and `ntpq -pn` showed one
+selected stratum-2 peer with reach `140`.
+
+The application state directory had no `clock_state.json` or `ttl.json`.
+Therefore this review cannot prove that a saved TTL survived the reboot, that
+its deadline elapsed while powered off, or that the application entered
+`recovery_required` after the observed clock adjustments. USBGuard was
+inactive and IPC unavailable, so no live policy/Reaper test was possible.
+No service, device authorization, or policy was changed during this review.
+
+The WSL unit suite now includes mocked regression cases for a synchronized
+clock, an untrusted clock, restore-journal exit status, and preservation of
+rules read from both `RuleFile` and `RuleFolder`. These tests pass, but do not
+replace a live reboot/TTL test. `MAX_CLOCK_JUMP_SECONDS=3600` remains an
+example value, not an approved threshold. G-01 remains `UNVERIFIED`.

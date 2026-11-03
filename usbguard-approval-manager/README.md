@@ -22,9 +22,13 @@ calendar clock guards with focused unit tests. The USBGuard adapter includes
 read and policy-changing operations, but every mutation is fail-closed behind
 a root-owned, mode-`0600` G-01 evidence marker and the shared process lock.
 Callers must hold the lock for the entire mutation operation. No marker is
-included in this project. The clock-sync provider remains disabled by default
-until G-01 verifies a target-specific source, so time-dependent operations
-fail closed.
+included in this project. The TTL stages and Reaper are implemented and
+mock-tested; the Reaper preserves rules found in either configured persistent
+policy source (`RuleFile` or `RuleFolder`) and requires recovery when clock
+trust or policy-source inspection fails. Live TTL/Reaper behavior remains
+unverified. The time guard recognizes NTP synchronization evidence, but the
+target's trust approval and `MAX_CLOCK_JUMP_SECONDS` threshold are still
+outstanding, so G-01 remains unverified.
 
 ## Development rules
 
@@ -83,8 +87,8 @@ which must preserve any already-applied policy result.
 
 `time-guards.sh` does not set or adjust the system clock. Its unit tests use
 simulated provider evidence and clock samples; they do not prove that a real
-time-sync source is trustworthy. Implement and enable that provider only after
-the G-01 evidence is documented for the target system.
+time-sync source is trustworthy. The live VM's current synchronization is
+evidence only, not approval of that source or the example jump threshold.
 
 Before any real G-01 tests, complete [docs/lab-checklist.md](docs/lab-checklist.md).
 The checklist is planning guidance, not evidence that the VM is currently ready.

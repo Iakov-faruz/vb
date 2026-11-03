@@ -190,11 +190,11 @@ The detailed evidence and exact limits are in
 
 | Test | Reason |
 |------|--------|
-| Actual OS reboot with trusted clock and powered-off TTL | Not run |
-| Reboot with unsynchronized/jumped clock | Not run; recovery behavior is covered by unit tests only |
+| End-to-end OS reboot with an active TTL and verified expiration while powered off | Not run; the post-reboot review found no application TTL or clock baseline |
+| Live reboot with unsynchronized/jumped clock | Not run; simulated clock and recovery cases are covered by unit tests only |
 | Approved time source and `MAX_CLOCK_JUMP_SECONDS` threshold | Not established; `3600` is an example, not an approved value |
 | Independent VM recovery route / snapshot restore | Not tested |
-| Phase 3 components (`validators.sh`, `stages.sh`, `cleanup-expired.sh`, `usb-revoke.sh`) | Not yet implemented |
+| Phase 3 components (`validators.sh`, `stages.sh`, `cleanup-expired.sh`, `usb-revoke.sh`) | Implemented locally; mocked unit coverage added |
 
 ---
 
@@ -205,6 +205,25 @@ The detailed evidence and exact limits are in
 | Phase 1 (read-only foundation) | ✅ Complete |
 | Phase 2 (write operations + G-01 code) | ✅ Code merged, unit tests pass on WSL and VM |
 | G-01 VM verification | ⏳ **UNVERIFIED** — real reboot recovery and threshold approval outstanding |
-| Phase 3 (TTL Engine + Reaper) | ⏳ Not started |
+| Phase 3 (TTL Engine + Reaper) | ✅ Implemented and locally unit-tested; live G-01 validation outstanding |
 
-**Next step:** Complete G-01 verification in isolated lab VM (see `docs/lab-checklist.md` and `docs/g01-preflight-report.md`), then proceed to Phase 3.
+**Next step:** Complete G-01 verification in the isolated lab VM before
+attempting live Phase 3 integration (see `docs/lab-checklist.md` and
+`docs/g01-preflight-report.md`).
+
+---
+
+## Latest local verification
+
+The WSL syntax checks and all 12 shell unit-test scripts pass, including the
+new validator, stage, Reaper, and revoke argument cases. All 21 Python unit
+tests pass. The Reaper tests verify that an untrusted clock prevents
+expiration, an open restore journal returns exit code `9` with
+`RECOVERY_REQUIRED`, and rules in both `RuleFile` and `RuleFolder` are never
+removed by TTL cleanup.
+
+The reboot review is documented in `g01-preflight-report.md`. It found clock
+adjustments but no application clock baseline or TTL state, so it is not proof
+of reboot recovery or powered-off TTL handling. The VM's USBGuard service was
+inactive during that review. G-01 remains `UNVERIFIED`; do not treat these
+mocked tests as authorization for live policy changes.

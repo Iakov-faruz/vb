@@ -10,7 +10,7 @@ if [[ -z "${USBAM_USB_POLICY_LOADED+x}" ]]; then
   declare -g USBAM_POLICY_STDERR=""
   declare -g USBAM_POLICY_ERROR_CODE=""
   declare -g USBAM_POLICY_VERSION=""
-  declare -g USBAM_DAEMON_CONFIG_PATH="/etc/usbguard/usbguard-daemon.conf"
+  declare -g USBAM_DAEMON_CONFIG_PATH="${USBAM_DAEMON_CONFIG_PATH:-/etc/usbguard/usbguard-daemon.conf}"
   declare -ga USBAM_BLOCKED_DEVICES=()
   declare -ga USBAM_ACTIVE_RULES=()
   declare -gA USBAM_PERSISTENT_POLICY_PATHS=()
@@ -401,6 +401,100 @@ get_persistent_policy_paths() {
     USBAM_PERSISTENT_POLICY_PATHS[RuleFolder]="$rule_folder"
   fi
   return 0
+}
+
+usbguard_policy_file_contains_rule() {
+  local file_path="$1"
+  local target_rule="$2"
+  local line canonical
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" =~ [[:cntrl:]] ]]; then
+      usbguard_policy_error "control character in persistent policy file: $file_path"
+      USBAM_POLICY_ERROR_CODE="invalid_persistent_policy"
+      return 2
+    fi
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    if ! usbguard_validate_rule "$line"; then
+      usbguard_policy_error "invalid rule in persistent policy file: $file_path"
+      USBAM_POLICY_ERROR_CODE="invalid_persistent_policy"
+      return 2
+    fi
+    canonical="$(usbguard_canonicalize_rule "$line")"
+    if [[ "$canonical" == "$target_rule" ]]; then
+      return 0
+    fi
+  done < "$file_path"
+  return 1
+}
+
+usbguard_rule_is_persistent() {
+  local target_rule="$1"
+  local path status listing_file
+  local -a policy_files=()
+
+  if (( $# != 1 )) || ! usbguard_validate_rule "$target_rule"; then
+    USBAM_POLICY_ERROR_CODE="invalid_arguments"
+    return 2
+  fi
+  target_rule="$(usbguard_canonicalize_rule "$target_rule")"
+  if ! get_persistent_policy_paths; then
+    return 2
+  fi
+
+  if [[ -n "${USBAM_PERSISTENT_POLICY_PATHS[RuleFile]:-}" ]]; then
+    path="${USBAM_PERSISTENT_POLICY_PATHS[RuleFile]}"
+    if usbguard_policy_file_contains_rule "$path" "$target_rule"; then
+      return 0
+    else
+      status=$?
+      if (( status != 1 )); then
+        return 2
+      fi
+    fi
+  fi
+
+  if [[ -n "${USBAM_PERSISTENT_POLICY_PATHS[RuleFolder]:-}" ]]; then
+    listing_file="$(mktemp)" || {
+      USBAM_POLICY_ERROR_CODE="temporary_storage_unavailable"
+      return 2
+    }
+    if ! find "${USBAM_PERSISTENT_POLICY_PATHS[RuleFolder]}" \
+      -mindepth 1 -maxdepth 1 -print0 > "$listing_file"; then
+      rm -f -- "$listing_file" || true
+      USBAM_POLICY_ERROR_CODE="persistent_policy_unreadable"
+      return 2
+    fi
+
+    while IFS= read -r -d '' path; do
+      if [[ -L "$path" || ! -f "$path" || ! -r "$path" ]]; then
+        rm -f -- "$listing_file" || true
+        USBAM_POLICY_ERROR_CODE="unsafe_persistent_policy_entry"
+        return 2
+      fi
+      if usbguard_policy_file_contains_rule "$path" "$target_rule"; then
+        rm -f -- "$listing_file" || {
+          USBAM_POLICY_ERROR_CODE="temporary_storage_cleanup_failed"
+          return 2
+        }
+        return 0
+      else
+        status=$?
+        if (( status != 1 )); then
+          rm -f -- "$listing_file" || true
+          return 2
+        fi
+      fi
+    done < "$listing_file"
+
+    if ! rm -f -- "$listing_file"; then
+      USBAM_POLICY_ERROR_CODE="temporary_storage_cleanup_failed"
+      return 2
+    fi
+  fi
+  return 1
 }
 
 check_daemon_status() {
