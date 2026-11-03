@@ -3,15 +3,30 @@
 # Usage: sudo bash tests/quick/clock_time_check.sh
 set -eo pipefail
 
+if [[ $EUID -ne 0 ]]; then
+    printf '[-] Error: This script must be run with root privileges (sudo).\n' >&2
+    exit 1
+fi
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
-source "$PROJECT_ROOT/scripts/lib/time-guards.sh"
+
+TIME_GUARDS_PATH="$PROJECT_ROOT/scripts/lib/time-guards.sh"
+if [[ ! -f "$TIME_GUARDS_PATH" ]]; then
+    printf '[-] Critical: Dependency missing: %s\n' "$TIME_GUARDS_PATH" >&2
+    exit 1
+fi
+source "$TIME_GUARDS_PATH"
 
 declare -A CONFIG_VALUES
 
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
 PASS=0; FAIL=0
-pass() { printf 'PASS: %s\n' "$1"; PASS=$((PASS+1)); }
-fail() { printf 'FAIL: %s\n' "$1"; FAIL=$((FAIL+1)); }
+pass() { printf '%bPASS%b: %s\n' "$GREEN" "$NC" "$1"; PASS=$((PASS+1)); }
+fail() { printf '%bFAIL%b: %s\n' "$RED" "$NC" "$1"; FAIL=$((FAIL+1)); }
 
 printf '=== Clock / time-guard check ===\n'
 printf 'check_time_utc=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
@@ -57,13 +72,13 @@ if clock_sync_evidence; then
   printf '  sync_status=%s\n' "$CLOCK_SYNC_STATUS"
   pass "clock synchronization evidence is verified"
 else
-  fail "clock synchronization evidence unavailable (${CLOCK_TRUST_DETAIL_CODE:-unknown})"
+  fail "clock synchronization evidence unavailable (code=${CLOCK_TRUST_DETAIL_CODE:-unknown})"
 fi
 
 # 6. Probe clock trust using a disposable state file
 STATE_FILE="$(mktemp "${TMPDIR:-/tmp}/usbam-clock-check.XXXXXX")"
 rm -f -- "$STATE_FILE"
-trap 'rm -f -- "$STATE_FILE"' EXIT
+trap 'rm -f -- "$STATE_FILE"' EXIT INT TERM
 if detect_clock_jump "$STATE_FILE" no; then
   printf '  CLOCK_TRUST_STATUS=%s\n' "${CLOCK_TRUST_STATUS:-<unset>}"
   printf '  CLOCK_TRUST_DETAIL_CODE=%s\n' "${CLOCK_TRUST_DETAIL_CODE:-<unset>}"

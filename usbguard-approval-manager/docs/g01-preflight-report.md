@@ -1,13 +1,48 @@
 # G-01 Lab Preflight Report
 
-**Checked:** 2026-11-03 19:46 UTC
+**Checked:** 2026-11-03 20:38 UTC
 **Overall G-01 status:** `UNVERIFIED`  
 **Scope:** Isolated live testing with the unmounted disposable USB and
 temporary policy files under `/run`; a later bounded test also started the
 installed service and temporarily changed then restored its RuleFile. Clock
 and reboot tests were not run.
 
-## Latest live lab observation — 2026-11-03 19:46 UTC
+## Latest clean-clone verification — 2026-11-03 20:38 UTC
+
+The VM was updated from the pushed repository and its clean clone is at commit
+`c1d917b`. `make test` passed, including shell syntax checks, all shell unit
+tests, and all 21 Python tests.
+
+The isolated integration test used the USB `048d:1234`, a temporary daemon
+configuration, and a temporary policy under `/run`. Its initial kernel
+authorization was `0`, so no USB disk node was present. The test verified:
+
+- `append-rule --temporary` did not authorize the connected device; the
+  explicit `allow-device` operation did.
+- `block-device` blocked/deauthorized the device, and a later temporary
+  allow did not override the earlier block rule.
+- A permanent test rule survived restart of the isolated daemon and was then
+  removed from the temporary policy.
+- Cleanup restored the initial kernel authorization (`0`) and verified that
+  no USB disk was present or mounted.
+- The installed service stayed inactive and disabled; no daemon remained.
+  `/etc/usbguard/rules.conf` retained its original empty-file SHA-256:
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The script returned its expected exit status `9`; this means the verified USB
+observations did not certify the outstanding clock/reboot gates. Evidence is
+retained at
+`/var/tmp/usbguard-approval-manager-g01-c1d917b/g01-20261103T203827Z.p8GbPh`.
+The installed service and persistent policy were not changed by this run.
+
+Clock observations were `ntpsec` active, `NTPSynchronized=yes`, and one
+selected stratum-2 peer with reach `377`. `ntpq -c rv` also contained the
+`no_sys_peer` event text. This is current-state evidence only; it does not
+approve the provider or the example `MAX_CLOCK_JUMP_SECONDS=3600`. No OS
+reboot, unsynchronized-clock recovery, or powered-off TTL-expiry test was run.
+G-01 remains `UNVERIFIED`.
+
+## Earlier live lab observation — 2026-11-03 19:46 UTC
 
 The VM was confirmed in VirtualBox as the running `kali` machine. VirtualBox
 reported current snapshot `20:39 3.11.26` (UUID
@@ -15,7 +50,7 @@ reported current snapshot `20:39 3.11.26` (UUID
 USBGuard 1.1.4's installed service was inactive, no daemon or IPC socket was
 present, and the sole USB disk (`048d:1234`) was unmounted.
 
-The latest isolated integration run used a temporary daemon configuration and
+That isolated integration run used a temporary daemon configuration and
 policy under `/run`; the installed service and `/etc/usbguard` policy were not
 started or changed. Its results:
 

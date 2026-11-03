@@ -51,10 +51,30 @@ The live test uses the USBGuard CLI directly because the adapter must remain
 gated until G-01 is approved; mocked unit tests cover the adapter methods.
 It verifies kernel authorization and the USB disk node as well as USBGuard's
 reported device state. After stopping its isolated daemon, it restores the
-test USB's kernel authorization, waits up to 10 seconds for the disk to
-re-enumerate, and verifies that the disk is unmounted.
+test USB's initial kernel authorization, waits up to 10 seconds for the
+corresponding disk presence or absence, and verifies that no test disk is
+mounted.
 Override `BASH` or `PYTHON` if needed, for example
 `make test PYTHON=python3.13`.
+
+The quick status scripts are read-only except for private report files:
+
+```bash
+sudo env USBAM_G01_EXPECTED_HOSTNAME=vbox bash tests/quick/g01_status_check.sh
+sudo env USBAM_TEST_USB_ID=048d:1234 bash tests/quick/usb_device_check.sh
+sudo bash tests/quick/clock_time_check.sh
+```
+
+The G-01 integration wrapper is not a status-only check: it changes the
+selected USB's kernel authorization in the isolated lab. It requires explicit
+hostname, device-ID, write, and confirmation values and refuses to stop or
+modify the installed USBGuard service:
+
+```bash
+sudo env USBAM_TEST_USB_ID=048d:1234 USBAM_G01_EXPECTED_HOSTNAME=vbox \
+  USBAM_G01_ALLOW_WRITE=1 USBAM_G01_CONFIRM=YES \
+  bash tests/quick/run_g01_integration.sh
+```
 
 Audit writes require the protected `/var/log/usbguard-approval-manager`
 directory owned by `root:usbadmins` with mode `0750`; the Audit file is

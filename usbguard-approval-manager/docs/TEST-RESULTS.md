@@ -145,10 +145,12 @@ unapproved example, and no actual reboot was performed.
 
 ## 6. Isolated G-01 Integration — VM Results
 
-The bounded lab integration was run against the disposable USB
-`048d:1234` using a temporary daemon configuration and policy. USB-state and
-rule behavior passed; the script returned its expected exit status `9` because
-the clock/reboot gates are intentionally not certified:
+The clean VM clone at commit `c1d917b` passed `make test`, including shell
+syntax checks, all shell unit tests, and all 21 Python tests. The bounded lab
+integration was then run against the disposable USB `048d:1234` using a
+temporary daemon configuration and policy. USB-state and rule behavior passed;
+the script returned its expected exit status `9` because the clock/reboot
+gates are intentionally not certified:
 
 - `append-rule --temporary` did not authorize the already-connected device.
 - `allow-device` authorized the device without changing persistent rules.
@@ -156,9 +158,21 @@ the clock/reboot gates are intentionally not certified:
   `allow` remained effective.
 - A permanent temporary-test rule survived isolated daemon restart, was then
   removed, and the temporary policy was cleaned up.
-- The installed service was separately tested and restored: it is inactive
-  and disabled, the persistent RuleFile is empty with its original hash, and
-  the USB is back to `authorized=0`.
+- This run began with the USB at sysfs `authorized=0` and no USB disk node.
+  Cleanup restored that exact initial state and verified that no USB disk
+  remained or was mounted.
+- The installed service remained inactive and disabled, no daemon remained,
+  and `/etc/usbguard/rules.conf` retained its original empty-file SHA-256:
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+- Live clock observations found `ntpsec` active, `NTPSynchronized=yes`, and a
+  selected stratum-2 peer with reach `377`. `ntpq -c rv` also reported the
+  `no_sys_peer` event text; these observations do not constitute approval of
+  the source or the example `MAX_CLOCK_JUMP_SECONDS=3600`.
+- No reboot or powered-off TTL test was performed. G-01 remains
+  `UNVERIFIED`.
+
+The retained VM evidence is
+`/var/tmp/usbguard-approval-manager-g01-c1d917b/g01-20261103T203827Z.p8GbPh`.
 
 The detailed evidence and exact limits are in
 [`g01-preflight-report.md`](./g01-preflight-report.md).

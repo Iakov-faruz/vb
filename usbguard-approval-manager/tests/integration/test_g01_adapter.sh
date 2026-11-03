@@ -43,6 +43,8 @@ wait_for_no_usb_disk() {
 [[ "$(id -u)" == "0" ]] || fail "run only as root inside the disposable lab VM"
 [[ "${USBAM_G01_CONFIRM:-}" == "YES" ]] ||
   fail "set USBAM_G01_CONFIRM=YES only after confirming the isolated VM and recovery snapshot"
+[[ "${USBAM_G01_ALLOW_WRITE:-}" == "1" ]] ||
+  fail "set USBAM_G01_ALLOW_WRITE=1 to explicitly allow the lab USB state changes"
 [[ -n "${USBAM_G01_EXPECTED_HOSTNAME:-}" ]] ||
   fail "USBAM_G01_EXPECTED_HOSTNAME is required"
 [[ "$(hostname)" == "$USBAM_G01_EXPECTED_HOSTNAME" ]] ||
