@@ -2,6 +2,7 @@
 # Interactive and CLI approval entry point (SRS v4.5, Sections 12 and 15).
 
 set -uo pipefail
+umask 077
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$SCRIPT_DIR/lib"
@@ -249,7 +250,10 @@ result_add_failure() {
   if [[ "$detail_code" == "inconsistent_state" ||
     "$detail_code" == "verification_failed" ||
     "$detail_code" == "atomic_write_failed" ||
-    "$detail_code" == "device_approval_failed_after_rule" ]]; then
+    "$detail_code" == "device_approval_failed" ||
+    "$detail_code" == "device_approval_failed_after_rule" ||
+    "$detail_code" == "permanent_rule_outcome_unknown" ||
+    "$detail_code" == "persistence_verification_failed" ]]; then
     result_add_item "$device_id" "$RESULT_UNKNOWN" "$EXIT_INCONSISTENT" \
       "$detail" unknown not_applicable "$detail_code"
     BATCH_UNCERTAIN=1
@@ -324,11 +328,17 @@ process_device() {
       "$current_rule" "$TTL_SECONDS" "$RESULT_CORRELATION_ID" "$device_id" \
       >"$output_file" 2>/dev/null; then
       managed_id="$(<"$output_file")"
-      rm -f -- "$output_file"
+      if ! rm -f -- "$output_file"; then
+        result_add_failure "$device_id" "$EXIT_INCONSISTENT" \
+          "temporary approval completed but private output cleanup failed" \
+          "temporary_storage_cleanup_failed"
+        lock_release || true
+        return
+      fi
       :
     else
       rc=$?
-      rm -f -- "$output_file"
+      rm -f -- "$output_file" || true
       result_add_failure "$device_id" "$rc" \
         "temporary approval failed: ${STAGES_ERROR_CODE:-unknown}" \
         "${STAGES_ERROR_CODE:-temporary_approval_failed}"
@@ -419,9 +429,6 @@ main() {
   if (( ${#REQUESTED_DEVICES[@]} > 0 )); then
     SELECTED_DEVICES=("${REQUESTED_DEVICES[@]}")
   else
-    if [[ -z "$APPROVAL_TYPE" ]]; then
-      :
-    fi
     if select_devices_interactively; then
       :
     else
@@ -446,16 +453,9 @@ main() {
     result_print_json
     exit "$EXIT_OK"
   fi
-  if confirm_approval; then
-    :
-  else
-    selected_rc=$?
-    result_start
-    result_cancelled "approval cancelled before policy change"
-    result_print_json
-    exit "$EXIT_CANCELLED"
+  if [[ "$APPROVAL_TYPE" == "temporary" ]] && [[ -z "$TTL_SECONDS" ]]; then
+    validation_error "temporary approval requires a TTL"
   fi
-
   if (( EUID != 0 )); then
     operation_error "policy-changing approvals require root privileges"
   fi
@@ -472,9 +472,30 @@ main() {
   if ! validators_is_uuid_v4 "$RESULT_CORRELATION_ID"; then
     operation_error "unable to generate a valid correlation ID"
   fi
+  if confirm_approval; then
+    :
+  else
+    selected_rc=$?
+    result_start
+    result_cancelled "approval cancelled before policy change"
+    result_print_json
+    exit "$EXIT_CANCELLED"
+  fi
 
-  for device_id in "${SELECTED_DEVICES[@]}"; do
+  local index
+  for ((index = 0; index < ${#SELECTED_DEVICES[@]}; index++)); do
+    device_id="${SELECTED_DEVICES[$index]}"
     process_device "$device_id"
+    if (( BATCH_UNCERTAIN )); then
+      for ((index++; index < ${#SELECTED_DEVICES[@]}; index++)); do
+        device_id="${SELECTED_DEVICES[$index]}"
+        result_add_item "$device_id" "$RESULT_OPERATION_FAILED" "$EXIT_OPERATION" \
+          "not processed because a previous device requires recovery" \
+          not_applied not_applicable "batch_stopped_for_recovery"
+        BATCH_FAILED=1
+      done
+      break
+    fi
   done
 
   if (( BATCH_UNCERTAIN )); then

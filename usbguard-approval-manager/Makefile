@@ -6,7 +6,7 @@ BASH ?= bash
 test: check-shell test-shell test-python
 
 check-shell:
-	@set -eu; for file in scripts/lib/*.sh tests/unit/*.sh tests/integration/*.sh tests/quick/*.sh; do $(BASH) -n "$$file"; done
+	@set -eu; for file in scripts/*.sh scripts/lib/*.sh tests/unit/*.sh tests/integration/*.sh tests/quick/*.sh; do $(BASH) -n "$$file"; done
 
 test-shell:
 	@set -eu; for test in tests/unit/test_*.sh; do $(BASH) "$$test"; done

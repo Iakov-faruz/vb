@@ -312,6 +312,35 @@ _stages_approve_temporary() {
     return 9
   fi
 
+  local canonical_rule
+  canonical_rule="$(usbguard_canonicalize_rule "$rule")"
+  if ! usbguard_check_precedence "$canonical_rule"; then
+    stages_error "precedence conflict for rule $canonical_rule" "precedence_conflict"
+    return 7
+  fi
+
+  local line active_id active_rule
+  for line in "${USBAM_ACTIVE_RULES[@]}"; do
+    if usbguard_parse_rule_line "$line" active_id active_rule &&
+      [[ "$active_rule" == "$canonical_rule" ]]; then
+      stages_error "matching rule already exists in active policy" "duplicate_rule"
+      return 7
+    fi
+  done
+
+  if usbguard_rule_is_persistent "$canonical_rule"; then
+    stages_error "matching permanent rule already exists; TTL would be redundant" \
+      "persistent_overlap"
+    return 7
+  else
+    local persistent_check_status=$?
+    if (( persistent_check_status != 1 )); then
+      stages_error "persistent policy could not be checked safely" \
+        "${USBAM_POLICY_ERROR_CODE:-persistent_policy_unavailable}"
+      return 9
+    fi
+  fi
+
   local has_records
   has_records="$(has_non_expired_records "$TTL_FILE")"
   if ! detect_clock_jump "$CLOCK_STATE_FILE" "$has_records"; then
@@ -350,19 +379,13 @@ _stages_approve_temporary() {
 
   # A live device and its future policy rule are separate USBGuard operations.
   if [[ -n "$device_id" ]] && ! approve_device "$device_id"; then
-    stages_update_status "$managed_id" "recovery_required" "$TTL_FILE" || true
+    if ! stages_update_status "$managed_id" "recovery_required" "$TTL_FILE"; then
+      stages_error "device approval failed and TTL record could not be marked for recovery: ${STAGES_ERROR_CODE:-status_update_failed}" \
+        "atomic_write_failed"
+      return 9
+    fi
     stages_error "device approval failed after TTL record creation" "device_approval_failed"
     return 9
-  fi
-
-  local canonical_rule
-  canonical_rule="$(usbguard_canonicalize_rule "$rule")"
-
-  # Check precedence and duplicate via policy adapter
-  if ! usbguard_check_precedence "$canonical_rule"; then
-    stages_update_status "$managed_id" "inconsistent" "$TTL_FILE" || true
-    stages_error "precedence conflict for rule $canonical_rule" "precedence_conflict"
-    return 7
   fi
 
   # Try to add temporary rule
@@ -371,14 +394,24 @@ _stages_approve_temporary() {
     # If rule was actually added but verification failed, we need to handle
     if usbguard_find_rule_id_by_canonical "$canonical_rule" >/dev/null 2>&1; then
       # Rule exists, but we are in inconsistent state - try to update to active if we can verify
-      if stages_update_status "$managed_id" "inconsistent" "$TTL_FILE"; then
-        :
+      if ! stages_update_status "$managed_id" "inconsistent" "$TTL_FILE"; then
+        stages_error "temporary rule outcome is uncertain and TTL record could not be marked inconsistent: ${STAGES_ERROR_CODE:-status_update_failed}" \
+          "atomic_write_failed"
+        return 9
       fi
       stages_error "temporary rule added but verification uncertain" "inconsistent_state"
       return 9
     else
-      # Rule not added, move to recovery_required if we cannot safely determine
-      stages_update_status "$managed_id" "recovery_required" "$TTL_FILE" || true
+      local rule_check_error="$USBAM_POLICY_ERROR_CODE"
+      if ! stages_update_status "$managed_id" "recovery_required" "$TTL_FILE"; then
+        stages_error "temporary rule failed and TTL record could not be marked for recovery: ${STAGES_ERROR_CODE:-status_update_failed}" \
+          "atomic_write_failed"
+        return 9
+      fi
+      if [[ -n "$device_id" ]] || [[ "$rule_check_error" != "rule_not_found" ]]; then
+        stages_error "temporary approval outcome is uncertain: $USBAM_POLICY_ERROR_CODE" "inconsistent_state"
+        return 9
+      fi
       stages_error "failed to add temporary rule: $USBAM_POLICY_ERROR_CODE" "policy_failed"
       return 1
     fi
@@ -433,8 +466,22 @@ _stages_approve_permanent() {
   fi
 
   if ! add_permanent_rule "$canonical_rule"; then
-    stages_error "failed to add permanent rule: $USBAM_POLICY_ERROR_CODE" "policy_failed"
-    return 1
+    local policy_error="$USBAM_POLICY_ERROR_CODE"
+    case "$policy_error" in
+      verification_failed|persistence_verification_failed|command_failed|command_timeout)
+        stages_error "permanent rule outcome is uncertain: $policy_error" \
+          "permanent_rule_outcome_unknown"
+        return 9
+        ;;
+      precedence_conflict|duplicate_rule)
+        stages_error "permanent rule rejected: $policy_error" "precedence_conflict"
+        return 7
+        ;;
+      *)
+        stages_error "failed to add permanent rule: $policy_error" "policy_failed"
+        return 1
+        ;;
+    esac
   fi
 
   if [[ -n "$device_id" ]] && ! approve_device "$device_id"; then

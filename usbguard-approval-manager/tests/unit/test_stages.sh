@@ -22,6 +22,7 @@ cat > "$FAKE_BIN/usbguard" <<'MOCK'
 STATE_DIR="${FAKE_STATE_DIR:-/tmp}"
 RULES_FILE="$STATE_DIR/active_rules.txt"
 BLOCKED_FILE="$STATE_DIR/blocked_devices.txt"
+printf '%s\n' "$*" >> "$STATE_DIR/usbguard-commands.log"
 case "$1" in
   --version) printf 'USBGuard 1.1.4\n' ;;
   list-devices)
@@ -163,6 +164,16 @@ validators_is_uuid_v4 "$new_managed" || fail "approve_temporary returned invalid
 status="$(jq -r ".records[] | select(.managed_id==\"$new_managed\") | .status" "$TTL_FILE")"
 [[ "$status" == "active" ]] || fail "approve_temporary should result in active, got $status"
 pass "stages_approve_temporary full transaction"
+
+new_device_managed="$(
+  stages_approve_temporary 'allow id abcd:ef03' 3600 \
+    'f212db55-5330-4b54-ae96-07582941c7c3' 1
+)" || fail "temporary approval with a connected device failed"
+[[ "$(jq -r ".records[] | select(.managed_id==\"$new_device_managed\") | .status" "$TTL_FILE")" == "active" ]] ||
+  fail "device approval transaction did not reach active TTL state"
+grep -Fqx 'allow-device 1' "$TEST_DIR/usbguard-commands.log" ||
+  fail "temporary approval did not explicitly approve the connected device"
+pass "temporary transaction approves the connected device separately from adding its rule"
 
 # Test that pending leftover goes to recovery_required in reconcile simulation
 # Create a pending record manually

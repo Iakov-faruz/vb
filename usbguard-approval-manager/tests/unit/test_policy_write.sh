@@ -74,6 +74,9 @@ case "$1" in
     max_id="$(awk -F: '{gsub(/ /,"",$1); if($1>max) max=$1} END{print max+0}' "$RULES_FILE")"
     new_id=$((max_id + 1))
     printf '%s: %s\n' "$new_id" "$rule" >> "$RULES_FILE"
+    if [[ " $* " != *" --temporary "* ]]; then
+      printf '%s\n' "$rule" >> "${FAKE_PERSISTENT_RULES_FILE:?}"
+    fi
     printf '%s\n' "$new_id"
     ;;
   remove-rule)
@@ -108,6 +111,8 @@ IPC_TIMEOUT_SECONDS=1
 USBAM_DAEMON_CONFIG_PATH="$TEST_DIR/usbguard-daemon.conf"
 printf 'RuleFile=%s\n' "$TEST_DIR/rules.conf" > "$USBAM_DAEMON_CONFIG_PATH"
 touch "$TEST_DIR/rules.conf"
+FAKE_PERSISTENT_RULES_FILE="$TEST_DIR/rules.conf"
+export FAKE_PERSISTENT_RULES_FILE
 
 fail() {
   printf 'FAIL: %s\n' "$1" >&2
@@ -229,6 +234,8 @@ fi
 pass "protected 00-system.rules is rejected"
 
 add_permanent_rule 'allow id 1111:2222' || fail "permanent rule append failed"
+grep -Fqx 'allow id 1111:2222' "$FAKE_PERSISTENT_RULES_FILE" ||
+  fail "permanent rule was not verified in the persistent policy"
 pass "permanent rule append succeeds"
 
 usbguard_find_rule_id_by_canonical 'allow id 1111:2222' >/dev/null ||

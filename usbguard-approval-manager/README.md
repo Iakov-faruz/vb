@@ -69,6 +69,39 @@ sudo env USBAM_TEST_USB_ID=048d:1234 bash tests/quick/usb_device_check.sh
 sudo bash tests/quick/clock_time_check.sh
 ```
 
+## Approving USB devices
+
+`scripts/usb-approve.sh` is the interactive and batch entry point. It fetches
+the current blocked-device list, validates the requested IDs, then re-fetches
+and compares each selected device while holding the global lock before any
+policy mutation. Each approval requires an explicit confirmation.
+
+```bash
+# Temporary approval (default TTL comes from TEMP_TTL_SECONDS)
+sudo scripts/usb-approve.sh --device 3 --type temporary
+
+# Temporary approval with an explicit TTL
+sudo scripts/usb-approve.sh --device 3 --type temporary --ttl 3600
+
+# Permanent approval
+sudo scripts/usb-approve.sh --device 3 --type permanent
+
+# Batch approval: each device is processed and reported separately
+sudo scripts/usb-approve.sh --device 3 --device 4 --type temporary --ttl 3600
+
+# Read-only plan; no policy, TTL, or Audit writes
+scripts/usb-approve.sh --device 3 --type temporary --ttl 3600 --dry-run
+```
+
+Omit `--device` to select blocked devices through the `whiptail` interface.
+Temporary approvals separately run `allow-device` for the currently connected
+device and add a TTL policy rule for future matching devices. Permanent
+approvals add and verify the persistent rule and separately allow the
+connected device. A live policy write still requires root, the G-01 evidence
+marker, the global lock, a functioning USBGuard daemon, and protected Audit
+storage. The CLI does not create or bypass the G-01 marker; until the required
+lab evidence is approved, write operations remain disabled.
+
 `scripts/usbguard-status.sh --json` provides the versioned monitoring
 contract (`schema_version: 1`), with daemon/IPC/timer health, TTL state counts,
 and separate policy and Audit result objects. It is read-only and reports an
