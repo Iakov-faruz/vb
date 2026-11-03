@@ -30,6 +30,16 @@ wait_for_usb_disk() {
   return 1
 }
 
+wait_for_no_usb_disk() {
+  local attempts="${1:-100}" count attempt
+  for ((attempt = 0; attempt < attempts; attempt++)); do
+    count="$(usb_disk_count)"
+    [[ "$count" == "0" ]] && return 0
+    sleep 0.1
+  done
+  return 1
+}
+
 [[ "$(id -u)" == "0" ]] || fail "run only as root inside the disposable lab VM"
 [[ "${USBAM_G01_CONFIRM:-}" == "YES" ]] ||
   fail "set USBAM_G01_CONFIRM=YES only after confirming the isolated VM and recovery snapshot"
@@ -66,8 +76,8 @@ usb_match_count="$(grep -c . <<< "$usb_matches" || true)"
   fail "expected exactly one attached USB device with VID:PID $test_usb_id; found $usb_match_count"
 usb_disk_count="$(usb_disk_count)"
 usb_mounted_count="$(usb_mounted_disk_count)"
-[[ "$usb_disk_count" == "1" ]] ||
-  fail "expected exactly one USB disk attached; found $usb_disk_count"
+[[ "$usb_disk_count" == "0" || "$usb_disk_count" == "1" ]] ||
+  fail "expected at most one USB disk attached; found $usb_disk_count"
 [[ "$usb_mounted_count" == "0" ]] ||
   fail "the USB disk is mounted; unmount it before testing"
 USB_SYSFS_PATH=""
@@ -84,6 +94,9 @@ for candidate in /sys/bus/usb/devices/*; do
 done
 [[ "$usb_sysfs_count" == "1" ]] ||
   fail "expected exactly one sysfs device for $test_usb_id; found $usb_sysfs_count"
+INITIAL_USB_AUTHORIZED="$(<"$USB_SYSFS_PATH/authorized")"
+[[ "$INITIAL_USB_AUTHORIZED" == "0" || "$INITIAL_USB_AUTHORIZED" == "1" ]] ||
+  fail "initial USB authorization state is invalid"
 
 TEST_DIR="$(mktemp -d /run/usbam-g01.XXXXXX)"
 RULE_FILE="$TEST_DIR/rules.conf"
@@ -146,29 +159,38 @@ cleanup() {
         printf 'WARNING: USB sysfs path no longer identifies the selected test device\n' >&2
         cleanup_failed=1
       else
-        if [[ "$(<"$USB_SYSFS_PATH/authorized")" == "0" ]]; then
-          printf 'RECOVERY: reauthorizing the confirmed test USB after isolated daemon shutdown\n'
-          if ! printf '1' > "$USB_SYSFS_PATH/authorized" ||
-            [[ "$(<"$USB_SYSFS_PATH/authorized")" != "1" ]]; then
-            printf 'WARNING: failed to restore kernel authorization for test USB %s\n' "$test_usb_id" >&2
+        local current_authorized
+        current_authorized="$(<"$USB_SYSFS_PATH/authorized")"
+        if [[ "$current_authorized" != "$INITIAL_USB_AUTHORIZED" ]]; then
+          printf 'RECOVERY: restoring test USB kernel authorization to initial value %s\n' \
+            "$INITIAL_USB_AUTHORIZED"
+          if ! printf '%s' "$INITIAL_USB_AUTHORIZED" > "$USB_SYSFS_PATH/authorized" ||
+            [[ "$(<"$USB_SYSFS_PATH/authorized")" != "$INITIAL_USB_AUTHORIZED" ]]; then
+            printf 'WARNING: failed to restore initial kernel authorization for test USB %s\n' "$test_usb_id" >&2
             cleanup_failed=1
           fi
         fi
         local restored_disks restored_mounts
-        if ! wait_for_usb_disk 100; then
+        if [[ "$INITIAL_USB_AUTHORIZED" == "1" ]] && ! wait_for_usb_disk 100; then
           restored_disks="$(usb_disk_count)"
           printf 'WARNING: USB recovery check found %s disks after waiting 10 seconds\n' \
+            "$restored_disks" >&2
+          cleanup_failed=1
+        elif [[ "$INITIAL_USB_AUTHORIZED" == "0" ]] && ! wait_for_no_usb_disk 100; then
+          restored_disks="$(usb_disk_count)"
+          printf 'WARNING: USB recovery check found %s disks after waiting 10 seconds; expected none\n' \
             "$restored_disks" >&2
           cleanup_failed=1
         else
           restored_disks="$(usb_disk_count)"
           restored_mounts="$(usb_mounted_disk_count)"
-          if [[ "$restored_disks" != "1" || "$restored_mounts" != "0" ]]; then
+          if [[ "$restored_disks" != "$INITIAL_USB_AUTHORIZED" || "$restored_mounts" != "0" ]]; then
             printf 'WARNING: USB recovery check found %s disks and %s mounted disks\n' \
               "$restored_disks" "$restored_mounts" >&2
             cleanup_failed=1
           else
-            printf 'RECOVERY: one unmounted USB disk is present after isolated daemon shutdown\n'
+            printf 'RECOVERY: USB authorization and disk presence match the initial state (%s)\n' \
+              "$INITIAL_USB_AUTHORIZED"
           fi
         fi
       fi
