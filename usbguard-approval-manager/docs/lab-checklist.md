@@ -1,10 +1,10 @@
 # USBGuard Lab Checklist
 
 Use this checklist before any G-01 test or USBGuard policy-changing operation.
-The current lab state is **UNVERIFIED**: the target installation, USB
-passthrough, USBGuard test policy, and recovery path must be confirmed again
-before testing. A previous host check found USBGuard absent; do not infer that
-the current VM is ready.
+An isolated live test on 2026-11-03 confirmed USBGuard 1.1.4 and the disposable
+USB in the VM, but the recovery route and reboot/clock behavior remain
+**UNVERIFIED**. Reconfirm current conditions before every test; prior evidence
+does not establish that the VM is currently ready.
 
 ## Lab entry criteria
 

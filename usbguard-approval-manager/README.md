@@ -18,12 +18,13 @@ remain at the repository root.
 
 The foundation includes a strict configuration reader, shared result model,
 atomic JSON writer, process lock, separate operational/Audit logging, and
-calendar clock guards with focused unit tests. A read-only USBGuard adapter is
-available for mocked CLI queries and daemon policy-source discovery, including
-configurations with both `RuleFile` and `RuleFolder`; policy-changing
-operations have not been implemented. The clock-sync provider remains disabled
-by default until G-01 verifies a target-specific source, so time-dependent
-operations fail closed.
+calendar clock guards with focused unit tests. The USBGuard adapter includes
+read and policy-changing operations, but every mutation is fail-closed behind
+a root-owned, mode-`0600` G-01 evidence marker and the shared process lock.
+Callers must hold the lock for the entire mutation operation. No marker is
+included in this project. The clock-sync provider remains disabled by default
+until G-01 verifies a target-specific source, so time-dependent operations
+fail closed.
 
 ## Development rules
 
@@ -41,9 +42,19 @@ From this directory in Linux/WSL, run the syntax checks and all unit tests with:
 make test
 ```
 
-The test target uses mocked USBGuard commands; it does not change policy or
-verify G-01 against a live daemon. Override `BASH` or `PYTHON` if needed, for
-example `make test PYTHON=python3.13`.
+The unit-test target uses mocked USBGuard commands; it does not change policy
+or verify G-01 against a live daemon. The G-01 integration test uses a
+temporary daemon configuration and policy but does change the selected
+physical USB device state. Run it only in the isolated lab VM, with the
+installed service inactive, the USB disk unmounted, and recovery available.
+The live test uses the USBGuard CLI directly because the adapter must remain
+gated until G-01 is approved; mocked unit tests cover the adapter methods.
+It verifies kernel authorization and the USB disk node as well as USBGuard's
+reported device state. After stopping its isolated daemon, it restores the
+test USB's kernel authorization, waits up to 10 seconds for the disk to
+re-enumerate, and verifies that the disk is unmounted.
+Override `BASH` or `PYTHON` if needed, for example
+`make test PYTHON=python3.13`.
 
 Audit writes require the protected `/var/log/usbguard-approval-manager`
 directory owned by `root:usbadmins` with mode `0750`; the Audit file is
@@ -57,6 +68,9 @@ the G-01 evidence is documented for the target system.
 
 Before any real G-01 tests, complete [docs/lab-checklist.md](docs/lab-checklist.md).
 The checklist is planning guidance, not evidence that the VM is currently ready.
-The latest non-invasive VM preflight is recorded in
+The integration test does not restart the installed service or create the
+verification marker. Keep G-01 `UNVERIFIED` until the clock and reboot cases
+are independently completed and reviewed.
+The latest VM observations are recorded in
 [docs/g01-preflight-report.md](docs/g01-preflight-report.md); G-01 remains
 `UNVERIFIED`.
