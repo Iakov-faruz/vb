@@ -3,8 +3,9 @@
 **Checked:** 2026-11-03 19:46 UTC
 **Overall G-01 status:** `UNVERIFIED`  
 **Scope:** Isolated live testing with the unmounted disposable USB and
-temporary policy files under `/run`. The installed USBGuard service and
-`/etc/usbguard` policy were not changed; clock and reboot tests were not run.
+temporary policy files under `/run`; a later bounded test also started the
+installed service and temporarily changed then restored its RuleFile. Clock
+and reboot tests were not run.
 
 ## Latest live lab observation — 2026-11-03 19:46 UTC
 
@@ -57,17 +58,51 @@ blocker before TTL/Reaper work or production writes. The live integration
 output is retained on the VM at
 `/var/tmp/usbguard-approval-manager-g01/g01-20261103T194600Z.PMTQLY`.
 
+## Installed service live test — 2026-11-03
+
+The deployed project copy of `usbguard-policy.sh` was updated to match the
+verified local version. With `CONFIG_VALUES` empty and
+`IPC_TIMEOUT_SECONDS` unset, `usbguard_policy_timeout` returned the default
+`5`. USBGuard 1.1.4's installed service was started without enabling it;
+the real adapter reported the daemon running and IPC connected, and
+successfully queried devices, blocked devices, rules, and both configured
+persistent policy sources.
+
+On the installed daemon, `append-rule --temporary` left
+`/etc/usbguard/rules.conf` unchanged and its rule was removed. A non-matching
+permanent test rule was appended to that file, survived an actual service
+restart, and was removed. The RuleFile returned to its original empty SHA-256
+(`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`); the
+daemon config and RuleFolder were unchanged.
+
+The lab USB (`048d:1234`) began with sysfs `authorized=0`. `allow-device`
+changed it to `allow` and `authorized=1`; `block-device` changed it back to
+`block` and `authorized=0`. It was never mounted. The service was stopped
+afterward and remained disabled; final checks confirmed the service inactive,
+no daemon process, the USB back at `authorized=0`, and no USB disk present.
+
+The adapter copy on the VM now matches the tested local SHA-256
+`13fccaee457fac82137474c4ff865346836ac14448ccc1a81dc810ae1c28d6f5`.
+During the live check, no socket file was found under `/run`, although
+`usbguard list-devices` and the adapter's IPC query succeeded. Use a successful
+USBGuard IPC query as the readiness check rather than requiring a socket file
+at a hard-coded path. The unit also logs that its `ConditionKernelCommandLine`
+and `ConditionPathExists` keys are ignored; startup and IPC nevertheless
+succeeded, and the installed unit was not modified.
+G-01 remains `UNVERIFIED` until the clock trust and reboot/recovery cases are
+verified.
+
 ## Environment observations
 
 | Check | Observation | Result |
 |---|---|---|
 | VM identity | Hostname `vbox`, user `yf`, Kali Linux x86_64, kernel `7.0.12+kali-amd64` | Recorded |
 | USBGuard CLI | `/usr/bin/usbguard`, version `1.1.4` | Installed |
-| USBGuard service | `inactive`; `systemctl is-enabled` reports `disabled` | Not ready for IPC integration |
-| Read-only IPC query | `usbguard list-devices` returned `IPC connect: service=usbguard: Connection refused`, exit status `1` | IPC unavailable |
+| USBGuard service | `inactive` after the test; `systemctl is-enabled` remains `disabled`. It started successfully for the live test. | Restored |
+| Read-only IPC query | Failed while the service was inactive; succeeded through both the CLI and adapter while the installed service was running. | Verified live |
 | Daemon configuration | `/etc/usbguard/usbguard-daemon.conf` is `root:root`, mode `0600`; it was inspected read-only with `sudo`. | Read |
 | Persistent policy settings | `RuleFile=/etc/usbguard/rules.conf` and `RuleFolder=/etc/usbguard/rules.d/` are both configured. USBGuard 1.1.4's local man page permits using both together. | Both sources identified |
-| Rule file | `/etc/usbguard/rules.conf` is `root:root`, mode `0600`, and contains zero active rule lines. | Read-only observation |
+| Rule file | `/etc/usbguard/rules.conf` is `root:root`, mode `0600`, and was empty before and after the live test; a permanent test rule survived restart and was removed. | Restored and verified |
 | Rule folder | `/etc/usbguard/rules.d/` exists and contains no files. | Read-only observation |
 | Service unit | Journal entries include warnings about unsupported `ConditionKernelCommandLine` and `ConditionPathExists` keys. Their impact on startup has not been determined. | Follow up; cause unverified |
 | Recovery evidence | Snapshot UUID is recorded above and USB passthrough was exercised; snapshot restore and independent console recovery were not tested | `UNVERIFIED` |
