@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
+source "$PROJECT_ROOT/scripts/lib/config-reader.sh"
 source "$PROJECT_ROOT/scripts/lib/usbguard-policy.sh"
 
 TEST_DIR="$(mktemp -d)"
@@ -80,6 +81,21 @@ pass() {
 assert_equal() {
   [[ "$1" == "$2" ]] || fail "$3 (expected '$2', got '$1')"
 }
+
+assert_equal "$(usbguard_policy_timeout)" "1" \
+  "timeout falls back to the environment value when configuration is not loaded"
+unset IPC_TIMEOUT_SECONDS
+assert_equal "$(usbguard_policy_timeout)" "5" \
+  "timeout falls back to the default when configuration is not loaded"
+IPC_TIMEOUT_SECONDS=1
+
+printf 'IPC_TIMEOUT_SECONDS=2\n' > "$TEST_DIR/timeout-config"
+load_config "$TEST_DIR/timeout-config" ||
+  fail "timeout configuration could not be loaded"
+assert_equal "$(usbguard_policy_timeout)" "2" \
+  "loaded configuration takes precedence over the environment fallback"
+CONFIG_VALUES=()
+pass "USBGuard timeout handles both empty and loaded configuration"
 
 get_usbguard_version >/dev/null || fail "version query failed"
 assert_equal "$USBAM_POLICY_VERSION" "USBGuard 1.1.4" "version output"

@@ -38,10 +38,13 @@ usbguard_policy_require_lock() {
 
 usbguard_policy_timeout() {
   if declare -F get_config >/dev/null 2>&1; then
-    get_config IPC_TIMEOUT_SECONDS
-  else
-    printf '%s\n' "${IPC_TIMEOUT_SECONDS:-5}"
+    local configured_timeout
+    if configured_timeout="$(get_config IPC_TIMEOUT_SECONDS 2>/dev/null)"; then
+      printf '%s\n' "$configured_timeout"
+      return 0
+    fi
   fi
+  printf '%s\n' "${IPC_TIMEOUT_SECONDS:-5}"
 }
 
 # Internal runner - shared logic for read-only and write
