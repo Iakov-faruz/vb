@@ -70,6 +70,12 @@ class LifecycleTests(unittest.TestCase):
         payloads = lifecycle.read_backup(archive)
 
         self.assertEqual(set(payloads), lifecycle.PAYLOAD_PATHS)
+        extracted = self.root / "extracted"
+        lifecycle.extract_backup(archive, extracted)
+        for name, data in payloads.items():
+            target = extracted / name
+            self.assertEqual(target.read_bytes(), data)
+            self.assertEqual(target.stat().st_mode & 0o777, 0o600)
         with tarfile.open(archive, "r:gz") as archive_file:
             manifest_member = archive_file.extractfile("manifest.json")
             self.assertIsNotNone(manifest_member)
@@ -102,6 +108,26 @@ class LifecycleTests(unittest.TestCase):
         ):
             with self.subTest(document=document), self.assertRaises(lifecycle.LifecycleError):
                 lifecycle.validate_export(document)
+
+    def test_export_enforces_rule_count_and_expiry_bounds(self) -> None:
+        with self.assertRaisesRegex(lifecycle.LifecycleError, "too many rules"):
+            lifecycle.validate_export(
+                {
+                    "schema_version": 1,
+                    "permanent_rules": ["allow id 1234:5678"] * 10001,
+                    "ttl_records": [],
+                }
+            )
+        with self.assertRaisesRegex(lifecycle.LifecycleError, "expires_at"):
+            lifecycle.validate_export(
+                {
+                    "schema_version": 1,
+                    "permanent_rules": [],
+                    "ttl_records": [
+                        {"rule": "allow id 1234:5678", "expires_at": 253402300800}
+                    ],
+                }
+            )
 
     def test_archive_rejects_traversal_and_hash_mismatch(self) -> None:
         archive = lifecycle.create_backup(
@@ -185,6 +211,28 @@ class LifecycleTests(unittest.TestCase):
         self.assertFalse(journal.exists())
         targets = json.loads(targets_file.read_text(encoding="utf-8"))
         self.assertTrue(all(Path(path).read_text(encoding="utf-8") == "old\n" for path in targets.values()))
+
+    def test_failed_recovery_keeps_journal_marked_for_recovery(self) -> None:
+        stage, targets_file, journal, rollback_root, _ = self._restore_fixture()
+        failure = lifecycle.LifecycleError("simulated rollback failure")
+        with (
+            mock.patch.object(lifecycle, "_remove_journal", side_effect=failure),
+            mock.patch.object(lifecycle, "_rollback_transaction", side_effect=failure),
+            self.assertRaises(lifecycle.LifecycleError),
+        ):
+            lifecycle.apply_restore(journal, rollback_root, targets_file, stage)
+        self.assertEqual(
+            json.loads(journal.read_text(encoding="utf-8"))["status"], "recovery_required"
+        )
+
+        with (
+            mock.patch.object(lifecycle, "_rollback_transaction", side_effect=failure),
+            self.assertRaisesRegex(lifecycle.LifecycleError, "recovery is incomplete"),
+        ):
+            lifecycle.recover_restore(journal, rollback_root, targets_file)
+        self.assertEqual(
+            json.loads(journal.read_text(encoding="utf-8"))["status"], "recovery_required"
+        )
 
     @unittest.skipUnless(hasattr(os, "symlink"), "symlinks are unavailable")
     def test_backup_refuses_symbolic_link(self) -> None:
