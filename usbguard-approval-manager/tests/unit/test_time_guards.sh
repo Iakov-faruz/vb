@@ -34,6 +34,94 @@ ACTUAL_EPOCH="$(get_current_epoch)" ||
 [[ "$ACTUAL_EPOCH" =~ ^[0-9]+$ ]] ||
   fail "system Epoch reader returned a non-integer"
 
+FAKE_BIN="$TEST_DIR/bin"
+ORIGINAL_PATH="$PATH"
+mkdir -p "$FAKE_BIN"
+cat > "$FAKE_BIN/systemctl" <<'MOCK'
+#!/usr/bin/env bash
+[[ "$1" == "is-active" && "$2" == "--quiet" ]] || exit 2
+[[ "$3" == "${FAKE_NTP_SERVICE:-ntpsec}" ]]
+MOCK
+cat > "$FAKE_BIN/timedatectl" <<'MOCK'
+#!/usr/bin/env bash
+[[ "$*" == "show -p NTPSynchronized --value" ]] || exit 2
+printf '%s\n' "${FAKE_TIME_SYNCED:-yes}"
+MOCK
+cat > "$FAKE_BIN/ntpq" <<'MOCK'
+#!/usr/bin/env bash
+[[ "$*" == "-pn" ]] || exit 2
+printf 'remote refid st t when poll reach delay offset jitter\n'
+case "${FAKE_NTP_PEER_MODE:-valid}" in
+  valid) printf '*192.0.2.1 192.0.2.2 2 u 10 64 377 1.0 0.1 0.2\n' ;;
+  no-peer) printf '+192.0.2.1 192.0.2.2 2 u 10 64 377 1.0 0.1 0.2\n' ;;
+  unreachable) printf '*192.0.2.1 192.0.2.2 2 u 10 64 0 1.0 0.1 0.2\n' ;;
+  invalid-stratum) printf '*192.0.2.1 192.0.2.2 16 u 10 64 377 1.0 0.1 0.2\n' ;;
+  *) exit 2 ;;
+esac
+MOCK
+chmod 700 "$FAKE_BIN/systemctl" "$FAKE_BIN/timedatectl" "$FAKE_BIN/ntpq"
+PATH="$FAKE_BIN:$PATH"
+export PATH
+
+clock_sync_evidence ||
+  fail "verified active ntpsec peer was rejected"
+[[ "$CLOCK_SYNC_PROVIDER" == "ntpsec" &&
+  "$CLOCK_SYNC_STATUS" == "synchronized" &&
+  "$CLOCK_TRUST_DETAIL_CODE" == "clock_sync_verified" ]] ||
+  fail "verified ntpsec evidence was not reported"
+pass "active NTP provider, synchronized system clock, and selected reachable peer are accepted"
+
+FAKE_TIME_SYNCED="no"
+export FAKE_TIME_SYNCED
+if clock_sync_evidence; then
+  fail "unsynchronized system clock was accepted"
+fi
+[[ "$CLOCK_TRUST_DETAIL_CODE" == "clock_sync_not_synchronized" ]] ||
+  fail "unsynchronized clock returned an unexpected detail code"
+unset FAKE_TIME_SYNCED
+pass "unsynchronized system clock is rejected"
+
+FAKE_NTP_PEER_MODE="no-peer"
+export FAKE_NTP_PEER_MODE
+if clock_sync_evidence; then
+  fail "NTP state without a selected peer was accepted"
+fi
+[[ "$CLOCK_TRUST_DETAIL_CODE" == "clock_sync_peer_unavailable" ]] ||
+  fail "missing selected peer returned an unexpected detail code"
+FAKE_NTP_PEER_MODE="unreachable"
+if clock_sync_evidence; then
+  fail "unreachable selected NTP peer was accepted"
+fi
+[[ "$CLOCK_TRUST_DETAIL_CODE" == "clock_sync_peer_unavailable" ]] ||
+  fail "unreachable peer returned an unexpected detail code"
+FAKE_NTP_PEER_MODE="invalid-stratum"
+if clock_sync_evidence; then
+  fail "invalid NTP stratum was accepted"
+fi
+[[ "$CLOCK_TRUST_DETAIL_CODE" == "clock_sync_peer_unavailable" ]] ||
+  fail "invalid stratum returned an unexpected detail code"
+unset FAKE_NTP_PEER_MODE
+pass "missing, unreachable, and invalid-stratum NTP peers are rejected"
+
+FAKE_NTP_SERVICE="none"
+export FAKE_NTP_SERVICE
+if clock_sync_evidence; then
+  fail "inactive NTP provider was accepted"
+fi
+[[ "$CLOCK_TRUST_DETAIL_CODE" == "clock_sync_provider_inactive" ]] ||
+  fail "inactive provider returned an unexpected detail code"
+unset FAKE_NTP_SERVICE
+pass "inactive NTP provider is rejected"
+PATH="$ORIGINAL_PATH"
+export PATH
+
+clock_sync_evidence() {
+  CLOCK_SYNC_PROVIDER=""
+  CLOCK_SYNC_STATUS=""
+  CLOCK_TRUST_DETAIL_CODE="clock_sync_provider_unverified"
+  return 1
+}
+
 get_current_epoch() {
   printf '%s\n' "$TEST_EPOCH"
 }
@@ -67,6 +155,18 @@ fi
 [[ ! -e "$TEST_DIR/no-provider.json" ]] ||
   fail "unverified provider created a clock baseline"
 pass "unverified sync provider fails closed without writing state"
+
+if detect_clock_jump "$TEST_DIR/no-provider-live-records.json" yes; then
+  fail "unverified provider was accepted with non-expired records"
+else
+  [[ "$?" -eq 9 ]] || fail "unverified provider with live records returned an unexpected status"
+fi
+[[ "$CLOCK_TRUST_STATUS" == "recovery_required" &&
+  "$CLOCK_TRUST_DETAIL_CODE" == "clock_state_recovery_required" ]] ||
+  fail "unverified provider with live records did not require recovery"
+[[ ! -e "$TEST_DIR/no-provider-live-records.json" ]] ||
+  fail "unverified provider with live records wrote a clock baseline"
+pass "unverified clock with non-expired records requires recovery without writing state"
 
 clock_sync_evidence() {
   CLOCK_SYNC_PROVIDER="$TEST_PROVIDER"

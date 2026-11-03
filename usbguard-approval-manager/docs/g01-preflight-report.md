@@ -58,6 +58,29 @@ blocker before TTL/Reaper work or production writes. The live integration
 output is retained on the VM at
 `/var/tmp/usbguard-approval-manager-g01/g01-20261103T194600Z.PMTQLY`.
 
+## Read-only clock and preflight check — 2026-11-03 20:27 UTC
+
+The VM's live clock check found `ntpsec` active, `timedatectl` reporting
+`NTPSynchronized=yes`, and exactly one selected NTP peer with stratum 2 and
+non-zero reach. The updated `clock_sync_evidence` returned
+`clock_sync_verified`. A separate `detect_clock_jump` probe initialized a
+baseline only in a temporary `/tmp` file, which was removed after the check.
+This verifies current synchronization evidence, not reboot recovery or an
+approved `MAX_CLOCK_JUMP_SECONDS`; the configured example value `3600` remains
+unapproved.
+
+The privileged read-only preflight was saved on the VM at
+`/tmp/g01-evidence/g01-preflight-report.md`. It exited with its expected
+fail-closed status `9`: the host and USBGuard version were identified, and
+`RuleFile=/etc/usbguard/rules.conf` plus
+`RuleFolder=/etc/usbguard/rules.d/` were read, but the service was stopped and
+IPC unavailable. Consequently device/rule queries were unavailable,
+policy-changing tests were not run, and G-01 remains `UNVERIFIED`.
+
+No daemon, USB authorization, or policy state was changed in this check. There
+was no `restore_journal.json` in the project, app-state, or evidence paths.
+No actual reboot or powered-off TTL-expiry test was performed.
+
 ## Installed service live test — 2026-11-03
 
 The deployed project copy of `usbguard-policy.sh` was updated to match the

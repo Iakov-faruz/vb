@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Calendar-time checks. Clock synchronization remains disabled until G-01
-# supplies a verified implementation of clock_sync_evidence.
+# Calendar-time checks using verified system NTP synchronization evidence.
 
 if [[ -z "${USBAM_TIME_GUARDS_LOADED+x}" ]]; then
   readonly USBAM_TIME_GUARDS_VERSION="1.0.0"
@@ -20,8 +19,63 @@ clock_error() {
 clock_sync_evidence() {
   CLOCK_SYNC_PROVIDER=""
   CLOCK_SYNC_STATUS=""
-  CLOCK_TRUST_DETAIL_CODE="clock_sync_provider_unverified"
-  return 1
+  CLOCK_TRUST_DETAIL_CODE="clock_sync_evidence_unavailable"
+
+  local provider sync_status peers
+  if ! command -v timeout >/dev/null 2>&1 ||
+    ! command -v systemctl >/dev/null 2>&1 ||
+    ! command -v timedatectl >/dev/null 2>&1 ||
+    ! command -v ntpq >/dev/null 2>&1 ||
+    ! command -v awk >/dev/null 2>&1; then
+    CLOCK_TRUST_DETAIL_CODE="clock_sync_tools_unavailable"
+    return 1
+  fi
+
+  provider=""
+  if timeout --foreground --signal=TERM --kill-after=1s 5s \
+    systemctl is-active --quiet ntpsec; then
+    provider="ntpsec"
+  elif timeout --foreground --signal=TERM --kill-after=1s 5s \
+    systemctl is-active --quiet ntp; then
+    provider="ntp"
+  else
+    CLOCK_TRUST_DETAIL_CODE="clock_sync_provider_inactive"
+    return 1
+  fi
+
+  if ! sync_status="$(
+    timeout --foreground --signal=TERM --kill-after=1s 5s \
+      timedatectl show -p NTPSynchronized --value 2>/dev/null
+  )"; then
+    CLOCK_TRUST_DETAIL_CODE="clock_sync_status_unavailable"
+    return 1
+  fi
+  if [[ "$sync_status" != "yes" ]]; then
+    CLOCK_TRUST_DETAIL_CODE="clock_sync_not_synchronized"
+    return 1
+  fi
+
+  if ! peers="$(
+    timeout --foreground --signal=TERM --kill-after=1s 5s \
+      ntpq -pn 2>/dev/null
+  )" || ! awk '
+    $1 ~ /^\*/ {
+      selected++
+      if ($3 !~ /^[0-9]+$/ || $3 < 1 || $3 > 15 ||
+          $7 !~ /^[0-7]+$/ || $7 ~ /^0+$/) {
+        invalid = 1
+      }
+    }
+    END { exit !(selected == 1 && !invalid) }
+  ' <<< "$peers"; then
+    CLOCK_TRUST_DETAIL_CODE="clock_sync_peer_unavailable"
+    return 1
+  fi
+
+  CLOCK_SYNC_PROVIDER="$provider"
+  CLOCK_SYNC_STATUS="synchronized"
+  CLOCK_TRUST_DETAIL_CODE="clock_sync_verified"
+  return 0
 }
 
 get_current_epoch() {
@@ -132,6 +186,11 @@ detect_clock_jump() {
     return 9
   fi
   if ! clock_sync_evidence; then
+    if [[ "$has_records" == "yes" ]]; then
+      CLOCK_TRUST_STATUS="recovery_required"
+      CLOCK_TRUST_DETAIL_CODE="clock_state_recovery_required"
+      return 9
+    fi
     CLOCK_TRUST_DETAIL_CODE="${CLOCK_TRUST_DETAIL_CODE:-clock_sync_provider_unverified}"
     return 9
   fi
