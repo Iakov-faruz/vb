@@ -3,9 +3,10 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
+daemon_config_path="${USBAM_DAEMON_CONFIG_PATH:-/etc/usbguard/usbguard-daemon.conf}"
 source "$PROJECT_ROOT/scripts/lib/usbguard-policy.sh"
 
-USBAM_DAEMON_CONFIG_PATH="${USBAM_DAEMON_CONFIG_PATH:-/etc/usbguard/usbguard-daemon.conf}"
+USBAM_DAEMON_CONFIG_PATH="$daemon_config_path"
 expected_hostname="${USBAM_G01_EXPECTED_HOSTNAME:-}"
 actual_hostname="$(hostname 2>/dev/null)" || actual_hostname=""
 

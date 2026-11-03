@@ -35,17 +35,15 @@ operations fail closed.
 
 ## Local checks
 
-From this directory in Linux/WSL, run the unit tests with:
+From this directory in Linux/WSL, run the syntax checks and all unit tests with:
 
-```sh
-bash tests/unit/test_config_reader.sh
-bash tests/unit/test_result.sh
-bash tests/unit/test_lock.sh
-bash tests/unit/test_logger.sh
-bash tests/unit/test_time_guards.sh
-bash tests/unit/test_policy_read.sh
-python3 -m unittest discover -s tests/unit -p 'test_*.py'
+```bash
+make test
 ```
+
+The test target uses mocked USBGuard commands; it does not change policy or
+verify G-01 against a live daemon. Override `BASH` or `PYTHON` if needed, for
+example `make test PYTHON=python3.13`.
 
 Audit writes require the protected `/var/log/usbguard-approval-manager`
 directory owned by `root:usbadmins` with mode `0750`; the Audit file is
