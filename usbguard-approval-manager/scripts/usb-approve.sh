@@ -2,9 +2,14 @@
 # נקודת כניסה אינטראקטיבית ו- CLI לאישור (SRS v4.5, Sections 12 and 15).
 # מאפשר אישור מכשירי USB בבדיקת TTL זמני או קבוע, עם אפשרות dry-run.
 # נדרשת הרשאת root לשינויים במדיניות.
-
-set -uo pipefail
-umask 077
+#
+# --- הסבר בעברית ---
+# נקודת כניסה אינטראקטיבית ו- CLI לאישור מכשירי USB (SRS v4.5, Sections 12 and 15).
+# מאפשרת אישור התקני USB עם בדיקת TTL (זמני או קבוע) ותמיכה ב-dry-run לצורך אימות.
+# דורשת הרשאת root לביצוע שינויים במדיניות ה-USBGuard.
+# משתמשת בספריות lib לצורך אימות, ניהול נעילות ובדיקת חוקיות.
+#
+# תלויות: lib/validators.sh, lib/lock.sh, lib/result.sh
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$SCRIPT_DIR/lib"

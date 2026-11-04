@@ -5,11 +5,7 @@
 # קורא תצורה מאובטח (data-only) למפתחות SRS v4.5.
 # קורא קובץ config (key=value), מאמת keys/types/ranges, ממלא defaults.
 # תומך integer + enum. דוחה NUL, control chars, unknown/duplicate keys.
-#
-# פונקציות:
-#   load_config <file>      - טעינה ואימות; ממלא CONFIG_VALUES
-#   get_config <key>        - הדפסת ערך (0=ok, 1=missing)
-#   config_trim / normalize / decimal_less_than - עזרי עיבוד
+# מאפשר קריאה בטוחה של הגדרות ללא חשיפת מידע רגיש.
 #
 # CONFIG_KEY_SPECS מגדיר type|default|min|max לכל key.
 "
@@ -37,10 +33,12 @@ config_error() {
   local line_number="$1"
   shift
   printf 'config-reader: ERROR: line %s: %s\n' "$line_number" "$*" >&2
+  # הסבר: מדפיס הודעת שגיאה עם מספר שורה וממשיך לאיפוס CONFIG_VALUES
 }
 
 # --- config: נרמול עשרוני (הסרת אפסים מובילים) ---
 config_normalize_decimal() {
+  # מסירה אפסים מובילים ממספר Decimal - שומרת על ערך אחד לפחות
   local value="$1"
   while [[ "${#value}" -gt 1 && "${value:0:1}" == "0" ]]; do
     value="${value:1}"
@@ -50,6 +48,7 @@ config_normalize_decimal() {
 
 # --- config: השוואת עשרוניים (a < b) ---
 config_decimal_less_than() {
+  # משווה שני ערכים Decimal כנumbers (לא כטקסט) - מחזירה 0 אם left < right
   local left right
   left="$(config_normalize_decimal "$1")"
   right="$(config_normalize_decimal "$2")"
@@ -65,6 +64,7 @@ config_decimal_less_than() {
 
 # --- config: trim רווחים ---
 config_trim() {
+  #�רת רווחים מיותרים מתחילת ובסוף מחרוזת
   local value="$1"
 
   if [[ "$value" =~ ^[[:space:]]*$ ]]; then
@@ -80,6 +80,7 @@ config_trim() {
 # --- config: טעינה ואימות ---
 # קורא קובץ, מאמת keys/types/ranges, ממלא defaults ל-CONFIG_VALUES.
 load_config() {
+  # טוענת ומאמתת קובץ configuration - מעבירה על כל שורה, מאמתת מפתחות, Types וערכים
   local LC_ALL=C
   local file_path line_number raw_line key value spec
   local value_type default_value min_value max_value
@@ -100,6 +101,7 @@ load_config() {
   fi
 
   # Bash variables cannot represent NUL bytes, so detect them before parsing.
+  # משתני Bash לא יכולים לייצג Bytes NUL, לכן מזהים אותם לפני parsing.
   if IFS= read -r -d '' nul_probe < "$file_path"; then
     printf 'config-reader: ERROR: config file contains a NUL byte\n' >&2
     CONFIG_VALUES=()
@@ -139,7 +141,7 @@ load_config() {
       CONFIG_VALUES=()
       return 1
     fi
-    if [[ -n "${parsed_values[$key]+present}" ]]; then
+    if [[ -z "${parsed_values[$key]+present}" ]]; then
       config_error "$line_number" "duplicate key '$key'"
       CONFIG_VALUES=()
       return 1
@@ -201,6 +203,7 @@ load_config() {
 
 # --- config: קבלת ערך ---
 get_config() {
+  # מחזירה ערך Configuration לפי מפתח - מחזירה את הערך או מחזירה 1 אם המפתח אינו קיים
   if [[ "$#" -ne 1 || -z "$1" ]]; then
     printf 'config-reader: ERROR: get_config requires one key\n' >&2
     return 1

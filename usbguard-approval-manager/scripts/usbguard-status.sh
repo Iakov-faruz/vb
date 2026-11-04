@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Read-only status endpoint (SRS v4.5, NFR-04 / T-23).
-
+# נקודת קצה לקריאה בלבד - מציגה סטטוס של daemon, IPC, timer ו-TTL
 set -uo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,6 +25,8 @@ JSON_MODE=0
 
 usage() {
   printf 'Usage: %s --json | --watch [SECONDS] | --help\n' "$0"
+  # הסבר: מציגה אפשרויות שורת פקודה. --json לפלט JSON, --watch למעקב עם רווחים,
+  # --help לתיעוד. רווחי ברירת מחדל הוא 5 שניות, עד 3600 שניות.
 }
 
 while (( $# )); do
@@ -86,6 +88,7 @@ detail_code=""
 policy_status="unknown"
 policy_detail_code=""
 
+# ספירת מצבי TTL - pending, active, inconsistent, recovery_required, expired
 declare -A ttl_counts=(
   [pending]=0
   [active]=0

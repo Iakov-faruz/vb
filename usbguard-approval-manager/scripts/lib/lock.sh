@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Shared process lock for state and policy mutations.
-# 
+#
 # --- הסבר בעברית ---
 # ספריית נעילה משותפת (process lock) לכל פעולות שינוי מצב/מדיניות.
 # מטרת הספרייה: להבטיח שרק תהליך אחד מבצע מוטציה במקביל (exclusivity),
 # ולמנוע race conditions על קבצי state/policy. הנעילה משתמשת ב-flock(2)
-# על קובץ נעילה ייעודי (/run/lock/...), ומוודאת בעלות/הרשאות קובץ.
+# על קובץ נעילה ייעודי (/run/lock/...), ומוודאית בעלות/הרשאות קובץ.
 # כל פונקציה מחזירה 0 בהצלחה, nonzero בכשל; הודעות שגיאה ל-stderr.
 #
 # פונקציות עיקריות:
@@ -13,11 +13,6 @@
 #   lock_release             - שחרור הנעילה (נקרא גם ב-EXIT trap)
 #   lock_validate_file      - בדיקת קובץ הנעילה (regular, לא symlink, בעלות/mode)
 #   lock_install_exit_trap  - התקנת trap לשחרור אוטומטי ביציאה
-#
-# משתנים גלובליים: LOCK_FILE, LOCK_FD, LOCK_HELD, LOCK_OWNER_PID.
-#
-# אזהרה: callers חייבים halten the lock for the entire mutation operation.
-"
 # Shared process lock for state and policy mutations.
 
 if [[ "$(declare -p USBAM_LOCK_LIBRARY_LOADED 2>/dev/null || true)" != "declare -r USBAM_LOCK_LIBRARY_LOADED="* ]]; then

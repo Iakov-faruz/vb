@@ -1,5 +1,18 @@
 #!/usr/bin/env python3
-"""Append one validated Audit JSONL record to the protected Audit log."""
+"""Append one validated Audit JSONL record to the protected Audit log.
+---
+הסבר בעברית:
+# הספריטה כותבת רקורד JSONL מוגן ל-log audit.
+# הכתיבה אטומית באמצעות atomic-write.py ומבטיחה הרשאות קבועות (root:usbadmins, mode 0640).
+# כל שגיאה בכתיבה חייבת להיות מדווחת; תוצאת המדיניות נשמרת.
+# פונקציות עיקריות:
+#   append_audit_record - הוספת רקורד חדש עם אימות מלא
+#   main - נקודת כניסה דרך CLI עם אפשרויות --action, --policy-result, --correlation-id, --details
+#   _validated_text - אימות אורך, אופי התוכן ומגבלות שדה
+#   _reject_json_constant - דחיית קבועי JSON לא-סטנדרטיים
+---
+אזהרה: Audit write failure must be reported; policy outcome preserved.
+"""
 
 from __future__ import annotations
 
@@ -34,10 +47,12 @@ class AuditWriteError(Exception):
 
 
 def _reject_json_constant(value: str) -> NoReturn:
+    """Reject non-standard JSON constants (e.g., `True`, `False`, `None`)."""
     raise ValueError(f"invalid JSON constant: {value}")
 
 
 def _validated_text(name: str, value: str, *, allow_empty: bool = False) -> str:
+    """Validate audit field: check non-empty, length limit, and no control characters."""
     if not allow_empty and not value:
         raise AuditWriteError(f"{name} must not be empty")
     if len(value) > FIELD_LIMITS[name]:
@@ -48,6 +63,7 @@ def _validated_text(name: str, value: str, *, allow_empty: bool = False) -> str:
 
 
 def _actor_uid() -> int | str:
+    """Get the actor UID from SUDO_UID or current process."""
     sudo_uid = os.environ.get("SUDO_UID", "")
     if re.fullmatch(r"[0-9]+", sudo_uid):
         return int(sudo_uid)
@@ -58,6 +74,7 @@ def _actor_uid() -> int | str:
 
 
 def _check_directory(group_id: int) -> None:
+    """Validate audit directory ownership and mode."""
     try:
         info = os.lstat(AUDIT_DIRECTORY)
     except OSError as error:
@@ -73,6 +90,7 @@ def _check_directory(group_id: int) -> None:
 
 
 def _open_audit_file(group_id: int) -> int:
+    """Open audit file with safe creation and permission checks."""
     flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT
     flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:

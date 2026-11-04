@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 # Calendar-time checks using verified system NTP synchronization evidence.
+#
+# --- הסבר בעברית ---
+# בדיקות זמן לוחיות באמצעות ראיות אימות סנכרון NTP של מערכת ההפעלה.
+# אחריות: להבטיח שהתאריכים והשעונים במערכת מהימנים לפני כל פעולת מדיניות.
+# תומך בבדיקת קפיצות שעון, פג תוקף TTL, ואילוצי זמן גלובליים.
+#
+# תלויות: clock_state.py - מצב שעון נוכחי, NVIDIA NTP provider status
 
 if [[ -z "${USBAM_TIME_GUARDS_LOADED+x}" ]]; then
   readonly USBAM_TIME_GUARDS_VERSION="1.0.0"

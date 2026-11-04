@@ -1,14 +1,22 @@
 #!/usr/bin/env bash
 # Shared Phase 5 data handling. Persistent rules are read only from configured,
 # non-system policy sources and are limited to validated allow rules.
+#
+# --- הסבר בעברית ---
+# טיפול שלב 5 משותף בנתונים מתמשכים. כללי קבע נקראים אך ורק ממקורות
+# מדיניות מוגדרים שאינם מערכתיים ומוגבלים לכללים מאומן של allow.
+# ספרייה אחראית על איסוף, אימות וייצוא כללי קבע בתקינה SEC-16.
 
 USBAM_LIFECYCLE_LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 USBAM_LIFECYCLE_HELPER="$USBAM_LIFECYCLE_LIB_DIR/lifecycle.py"
 
+# --- lifecycle: הדפסת שגיאה ---
 lifecycle_error() {
   printf 'lifecycle: ERROR: %s\n' "$*" >&2
 }
 
+# --- lifecycle: דרישת عدم journal ---
+# אם restore journal קיים ⇒ mutations חסומות.
 lifecycle_require_no_journal() {
   if [[ -e "$RESTORE_JOURNAL_FILE" || -L "$RESTORE_JOURNAL_FILE" ]]; then
     lifecycle_error "restore journal exists; run restore-rules.sh --recover first"
@@ -16,6 +24,8 @@ lifecycle_require_no_journal() {
   fi
 }
 
+# --- lifecycle: איסוף export JSON ---
+# קורא policy sources + TTL, מאמת, מסדר, מדפיס JSON.
 lifecycle_collect_export_json() {
   local work_dir policy_path policy_file candidate basename line canonical
   local ttl_records permanent_json normalized_output

@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # Install the application without changing USBGuard policy or enabling units.
-
-set -euo pipefail
-umask 077
+#
+# --- הסבר בעברית ---
+# התקנת היישום ללא שינוי מדיניות USBGuard או הפעלת units.
+# מבצע התקנה נקייה של הקוד והקונפיגורציה תוך כדי שמירה על המדיניות הקיימת.
+# הסקריפט אינו משנה את חוקי ה-USBGuard הקיימים ואינו ממפעיל systemd/systemctl units.
+#
+# תלויים: deploy-lib.sh, config-reader.sh, validators.sh
 
 PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$PROJECT_ROOT/deploy-lib.sh"

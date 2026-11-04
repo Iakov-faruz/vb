@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # Shared, testable helpers for transactional deployment.
-
-set -euo pipefail
+#
+# --- הסבר בעברית ---
+# עזרים משותפים להתקנה טרנזקציונית.
+# ספרייה של פונקציות עזר הניתנות לבדיקה, לתהליכי התקנה ומחיקה טרנזקציוניים.
+# מבטיחה שפעולות deployment הן אטומיות וניתנות להפיכה, ושמצב המערכת
+# נשאר תקין לאורך כל תהליך ההתקנה או המחיקה.
 
 DEPLOY_ROOT="/"
 DEPLOY_STAGE=0

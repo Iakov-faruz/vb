@@ -154,7 +154,7 @@ main() {
 
   result_start
 
-  # Load config if exists
+  # טוען config אם קיים
   if [[ -f "$CONFIG_PATH" ]]; then
     load_config "$CONFIG_PATH" || {
       log_error "config invalid"
@@ -164,7 +164,7 @@ main() {
     }
   fi
 
-  # Check restore journal
+  # בודקת יומן שחזור - אם קיים, חסימת revoke blocked
   if [[ -f "$STATE_DIR/restore_journal.json" ]]; then
     log_error "restore journal exists - recovery required, blocking revoke"
     result_recovery_required "restore journal exists"
@@ -172,7 +172,7 @@ main() {
     exit 9
   fi
 
-  # Check daemon
+  # בודקת daemon
   if ! check_daemon_status; then
     log_error "daemon not running or IPC unavailable"
     result_operation_failed "daemon unavailable"
@@ -180,7 +180,7 @@ main() {
     exit 1
   fi
 
-  # Validate ttl.json
+  #Validate ttl.json
   if ! validate_ttl_json "$TTL_FILE"; then
     log_error "ttl.json invalid: $VALIDATORS_ERROR"
     result_recovery_required "ttl.json invalid"
@@ -240,7 +240,6 @@ main() {
 
   # Get active rules and device details - need to list devices (not just blocked)
   if ! usbguard_policy_run_readonly list-devices >/dev/null 2>&1; then
-    # Fallback - try to get device via list-devices without args mocked?
     log_error "failed to list devices for verification"
     result_operation_failed "list devices failed"
     result_print_json

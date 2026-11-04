@@ -90,6 +90,7 @@ result_start() {
 
 # --- תוצאה: בדיקת מיפוי state/exit ---
 result_mapping_supported() {
+  # בודקת אם שילוב state ו-exit_code נתמך - תומכת במיפויים המוגדרים של result codes
   case "$1:$2" in
     "$RESULT_SUCCESS:$EXIT_OK"|\
       "$RESULT_OPERATION_FAILED:$EXIT_OPERATION"|\
@@ -106,6 +107,7 @@ result_mapping_supported() {
 
 # --- תוצאה: state מדיניות תקין ---
 result_policy_status_supported() {
+  # בודקת אם status של policy נתמך - values: applied|not_applied|unknown|not_applicable
   case "$1" in
     applied|not_applied|unknown|not_applicable) return 0 ;;
     *) return 1 ;;
@@ -114,6 +116,7 @@ result_policy_status_supported() {
 
 # --- תוצאה: state audit תקין ---
 result_audit_status_supported() {
+  # בודקת אם status של audit נתמך - values: written|failed|not_applicable
   case "$1" in
     written|failed|not_applicable) return 0 ;;
     *) return 1 ;;
@@ -122,6 +125,7 @@ result_audit_status_supported() {
 
 # --- תוצאה: סטטוסי item תקינים ---
 result_item_statuses_supported() {
+  # בודקת אם שילוב state:policy_status:audit_status נתמך - תומכת בקומבינציות מוגדרות
   local state="$1"
   local policy_status="$2"
   local audit_status="$3"
@@ -148,6 +152,9 @@ result_item_statuses_supported() {
 # --- תוצאה: קביעת state/exit/detail ---
 # מאמת מיפוי, מעדכן גלובלים.
 result_set() {
+  # קובעת state גלובלי של תוצאה - מאמתת mapping נתמך, גנרטור correlation_id,
+  # ומעדכנת את כל משתני ה-state הקשורים (RESULT_STATE, RESULT_EXIT_CODE,
+  # RESULT_DETAIL, RESULT_POLICY_STATUS, RESULT_AUDIT_STATUS וכו')
   local state="$1"
   local exit_code="$2"
   local detail="${3:-}"

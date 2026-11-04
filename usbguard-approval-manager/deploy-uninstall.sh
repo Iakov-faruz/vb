@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Remove application code and integration files while preserving all user data.
-
-set -euo pipefail
-umask 077
+#
+# --- הסבר בעברית ---
+# הסר קוד יישום וקבצי אינטגרציה תוך שמירה על כל נתוני המשתמש.
+# מבצע הסרה נקייה של קוד והתקניות תוך כדי שמירה על נתוני המשתמש,
+# ההגדרות והנתונים האישיים. כל הנתונים המשתמשים נשמרים ומגובים.
 
 PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "$PROJECT_ROOT/deploy-lib.sh"

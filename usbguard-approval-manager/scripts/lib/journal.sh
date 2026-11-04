@@ -1,5 +1,32 @@
 #!/usr/bin/env bash
+# Journal helpers for restore/recovery safety.
+#
+# --- הסבר בעברית ---
+# עזרי יומן (journal) לבטיחות restore/recovery.
+# יומן קיים ⇒ mutations חסומות עד --recover (אימות ושחזור).
+# מנהל נעילות state/policy (native lock files), UUID v4, אימות סכימה.
+#
+# פונקציות עיקריות:
+#   journal_exists / journal_validate / journal_create / journal_read / journal_delete
+#   journal_check_and_block - חסימת mutations אם יומן קיים
+#   journal_acquire_*_lock / journal_release_*_lock - נעילות state/policy
+#   journal_last_correlation_id - correlation id אחרון
+"
 # scripts/lib/journal.sh
+# Phase 5 - restore_journal.json management with atomic-write and split-locking
+# SRS v4.5: Backup/Restore with journal, G-01 gate, Split-Locking
+#
+# This library is the only owner of restore_journal.json lifecycle.
+# It provides creation, existence check, validation and deletion
+# with atomic writes and state/policy split locks.
+#
+# --- הסבר בעברית ---
+# ניהולjournal restore_journal.json בשלב 5 עם כתיבה אטומית ונעילת פיצול.
+# ספרייה זו היא הבעלים היחיד של מחזור החיים של restore_journal.json.
+# היא מספקת יצירה, בדיקת קיימות, אימות ומחיקה
+# עם כתיבה אטומית ונעילות הפרדת מצב/מדיניות.
+# יומן קיים ⇒ mutations חסומות עד --recover (אימות ושחזור).
+# מנהל נעילות state/policy (קבצי נעילה נפרדים), UUID v4, אימות סכימה.
 # Phase 5 - restore_journal.json management with atomic-write and split-locking
 # SRS v4.5: Backup/Restore with journal, G-01 gate, Split-Locking
 #
@@ -62,12 +89,14 @@ if [[ -z "${USBAM_JOURNAL_LOADED+x}" ]]; then
   declare -gr USBAM_JOURNAL_LOADED=1
 fi
 
+# --- journal: הדפסת שגיאה ---
 journal_error() {
   JOURNAL_ERROR="$1"
   JOURNAL_ERROR_CODE="${2:-journal_failed}"
   printf 'journal: ERROR: %s\n' "$1" >&2
 }
 
+# --- journal: יצירת UUID v4 ---
 journal_generate_uuid() {
   if [[ -r /proc/sys/kernel/random/uuid ]]; then
     cat /proc/sys/kernel/random/uuid
@@ -76,11 +105,13 @@ journal_generate_uuid() {
   fi
 }
 
+# --- journal: אימות UUID v4 ---
 journal_is_uuid_v4() {
   local uuid="$1"
   [[ "$uuid" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$ ]]
 }
 
+# --- journal: הבטחת תיקיית state ---
 journal_ensure_state_dir() {
   if [[ -z "$JOURNAL_STATE_DIR" ]]; then
     journal_error "state dir is empty" "invalid_path"
@@ -113,6 +144,7 @@ journal_ensure_state_dir() {
   return 0
 }
 
+# --- journal: אימות קובץ lock ---
 journal_validate_lock_file() {
   local lock_path="$1"
   local expected actual
@@ -165,6 +197,7 @@ journal_validate_lock_file() {
   return 0
 }
 
+# --- journal: רכישת state lock ---
 journal_acquire_state_lock() {
   local timeout="${1:-5}"
   if (( $# != 1 )) || [[ ! "$timeout" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
@@ -204,6 +237,7 @@ journal_acquire_state_lock() {
   return 0
 }
 
+# --- journal: שחרור state lock ---
 journal_release_state_lock() {
   if (( JOURNAL_STATE_LOCK_HELD == 0 )); then
     return 0
@@ -223,6 +257,7 @@ journal_release_state_lock() {
   return 0
 }
 
+# --- journal: רכישת policy lock ---
 journal_acquire_policy_lock() {
   local timeout="${1:-5}"
   if (( $# != 1 )) || [[ ! "$timeout" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
@@ -260,6 +295,7 @@ journal_acquire_policy_lock() {
   return 0
 }
 
+# --- journal: שחרור policy lock ---
 journal_release_policy_lock() {
   if (( JOURNAL_POLICY_LOCK_HELD == 0 )); then
     return 0
@@ -279,6 +315,7 @@ journal_release_policy_lock() {
   return 0
 }
 
+# --- journal: רכישת שני locks ---
 journal_acquire_both_locks() {
   local timeout="${1:-5}"
   if ! journal_acquire_state_lock "$timeout"; then
@@ -291,6 +328,7 @@ journal_acquire_both_locks() {
   return 0
 }
 
+# --- journal: שחרור שני locks ---
 journal_release_both_locks() {
   # release in reverse order to avoid deadlock
   local rc=0
@@ -303,10 +341,12 @@ journal_release_both_locks() {
   return $rc
 }
 
+# --- journal: האם יומן קיים ---
 journal_exists() {
   [[ -f "$JOURNAL_FILE" ]]
 }
 
+# --- journal: אימות יומן ---
 journal_validate() {
   local file_path="${1:-$JOURNAL_FILE}"
   JOURNAL_ERROR=""
@@ -369,6 +409,7 @@ journal_validate() {
   return 0
 }
 
+# --- journal: יצירת יומן ---
 journal_create() {
   local backup_path="$1"
   local reason="${2:-restore}"
@@ -496,6 +537,7 @@ journal_create() {
   return 0
 }
 
+# --- journal: קריאת יומן ---
 journal_read() {
   local file_path="${1:-$JOURNAL_FILE}"
   if [[ ! -f "$file_path" ]]; then
@@ -505,6 +547,7 @@ journal_read() {
   cat -- "$file_path"
 }
 
+# --- journal: מחיקת יומן ---
 journal_delete() {
   JOURNAL_ERROR=""
   JOURNAL_ERROR_CODE=""
@@ -530,6 +573,7 @@ journal_delete() {
   return 0
 }
 
+# --- journal: חסימת mutations אם יומן קיים ---
 journal_check_and_block() {
   local file_path="${1:-$JOURNAL_FILE}"
   if [[ -f "$file_path" ]]; then
@@ -545,6 +589,7 @@ journal_check_and_block() {
 }
 
 # Helper to get correlation_id from last create
+# --- journal: correlation id אחרון ---
 journal_last_correlation_id() {
   printf '%s\n' "$JOURNAL_LAST_CORRELATION_ID"
 }

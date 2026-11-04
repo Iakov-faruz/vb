@@ -1,15 +1,28 @@
 #!/usr/bin/env bash
 # stages.sh - TTL lifecycle and commit logic (SRS v4.5 Section 12, 13)
-# Handles pending -> active -> expired transitions with atomic writes
+# handles pending -> active -> expired transitions with atomic writes
+#
+# --- הסבר בעברית ---
+# ניהול מחזור חיים של TTL ו לוגיקה של commit (SRS v4.5 סעיפים 12, 13).
+# מנהלת מעברים של TTL - pending -> active -> expired עם כתיבה אטומית.
+# אחריות: מעקב אחר חוקי TTL פעילים, פקיעת חוקים, וייצוא כללי קבע מאומן.
+# משתמשת בנעילות split-state ו-split-policy למניעת תנאים של race.
+#
+# משתני מפתח: STAGES_ERROR, STAGES_ERROR_CODE, STATE_DIR, TTL_FILE, CLOCK_STATE_FILE,
+# RESTORE_JOURNAL_FILE, USBAM_LAST_MANAGED_ID, USBAM_LAST_CORRELATION_ID
 
 if [[ -z "${USBAM_STAGES_LOADED+x}" ]]; then
   readonly USBAM_STAGES_VERSION="1.0.0"
   declare -g STAGES_ERROR=""
   declare -g STAGES_ERROR_CODE=""
   declare -g STATE_DIR="${USBAM_STATE_DIR:-/var/lib/usbguard-approval-manager}"
+  # נתיב ברירת מחדל לתיקיית מצב - בו מאוחסן ttl.json
   declare -g TTL_FILE="${USBAM_TTL_FILE:-$STATE_DIR/ttl.json}"
+  # נתיב ברירת מחדל לקובץ מצב השעון - משמש לאימות קפיצת שעון
   declare -g CLOCK_STATE_FILE="${USBAM_CLOCK_STATE_FILE:-$STATE_DIR/clock_state.json}"
+  # נתיב ברירת מחדל ליומן שחזור - משמש להתאוששות לאחר שחזור
   declare -g RESTORE_JOURNAL_FILE="${USBAM_RESTORE_JOURNAL_FILE:-$STATE_DIR/restore_journal.json}"
+  # משתני מעקב אחר האחרון שטופל
   declare -g USBAM_LAST_MANAGED_ID=""
   declare -g USBAM_LAST_CORRELATION_ID=""
   declare -gr USBAM_STAGES_LOADED=1
@@ -35,6 +48,8 @@ stages_error() {
 }
 
 stages_run_locked() {
+  # מריצה פעולה תחת נעילה - רוכשת lock אם נדרש, מפעילה את הפעולה המבוקשת,
+  # ומשחררת את הלock בתום הפעולה. מגנה מפני מצבים של lock_not_owned.
   local operation="$1"
   local acquired_lock=0 rc
   shift
@@ -64,6 +79,8 @@ stages_run_locked() {
 }
 
 stages_ensure_state_dir() {
+  # וודאת תיקיית מצב - דורשת lock Held, אינה מאפשרת סימבול-לינק,
+  # יוצרת תיקייה אם אינה קיימת ומגדירה הרשאות 700
   if (( LOCK_HELD == 0 )) || [[ "$LOCK_OWNER_PID" != "$BASHPID" ]]; then
     stages_error "state directory changes require the global lock" "lock_not_held"
     return 1
@@ -86,6 +103,8 @@ stages_ensure_state_dir() {
 }
 
 _stages_init_ttl_file_if_missing() {
+  # אתחול ttl.json אם אינו קיים - וודאת תיקיית מצב, יצירת JSON ראשוני אם נדרש,
+  # ושימוש בכתיבה אטומית דרך atomic-write.py
   if ! stages_ensure_state_dir; then
     return 1
   fi
@@ -103,6 +122,7 @@ _stages_init_ttl_file_if_missing() {
 
 # Create a pending record JSON object (not yet written to file)
 stages_create_pending_record() {
+  # יוצרת אובייקט JSON של רשומת pending - אינה כתובה לקובץ עד לשלב מאוחר יותר
   local rule="$1"
   local expires_at="$2"
   local correlation_id="${3:-}"
@@ -113,6 +133,7 @@ stages_create_pending_record() {
   fi
 
   # Validate rule via usbguard-policy helper
+  # אימות חוק באמצעות helper של usbguard-policy
   if ! declare -F usbguard_validate_rule >/dev/null 2>&1; then
     stages_error "usbguard policy validator not loaded" "dependency_missing"
     return 1
@@ -152,6 +173,7 @@ stages_create_pending_record() {
   USBAM_LAST_CORRELATION_ID="$correlation_id"
 
   # Build JSON record
+  # Build JSON record with managed_id, rule, sha256, expires_at, status, and correlation_id
   jq -n \
     --arg managed_id "$managed_id" \
     --arg rule "$canonical_rule" \
@@ -171,6 +193,8 @@ stages_create_pending_record() {
 
 # Atomically add a record to ttl.json
 _stages_add_record() {
+  # מוספת רשומה חדשה ל-ttl.json בכתיבה אטומית
+  # מאמתת תוכן קיים, מוסיפה את הרשומה החדשה via jq, ומבצעת write אטומי
   local record_json="$1"
   local file_path="${2:-$TTL_FILE}"
 
@@ -215,6 +239,8 @@ _stages_add_record() {
 
 # Update record status with transition validation
 _stages_update_status() {
+  # מעדכנת את סטטוס הרשומה עם אימות מעבר סטטוס
+  # מאמתת מעבר חוקי (pending->active, expired->...), וכותבת את השינוי אטומי
   local managed_id="$1"
   local new_status="$2"
   local file_path="${3:-$TTL_FILE}"
@@ -279,7 +305,16 @@ _stages_update_status() {
 # Full temporary approval transaction (stages.sh core)
 # Usage: stages_approve_temporary <rule> <ttl_seconds> [correlation_id]
 # Returns managed_id on success, updates ttl.json to active
+# עסקת אישוי זמני מלא (ליבת stages.sh)
+# שימוש: stages_approve_temporary <rule> <ttl_seconds> [correlation_id]
+# מחזירה managed_id בהצלחה, מעדכנת ttl.json למצב active
 _stages_approve_temporary() {
+  # Full temporary approval transaction (stages.sh core)
+  # Usage: stages_approve_temporary <rule> <ttl_seconds> [correlation_id]
+  # Returns managed_id on success, updates ttl.json to active
+  # עסקת אישוי זמני מלא (ליבת stages.sh)
+  # שימוש: stages_approve_temporary <rule> <ttl_seconds> [correlation_id]
+  # מחזירה managed_id בהצלחה, מעדכנת ttl.json למצב active
   local rule="$1"
   local ttl_seconds="$2"
   local correlation_id="${3:-}"
@@ -297,6 +332,7 @@ _stages_approve_temporary() {
   fi
 
   # Check restore journal - if exists, block
+  # בדיקת יומן שחזור - אם קיים, חסימת כל שינוי מדיניות
   if [[ -f "$RESTORE_JOURNAL_FILE" ]]; then
     stages_error "restore journal exists, recovery required before any policy change" "restore_journal_exists"
     return 9
@@ -350,6 +386,7 @@ _stages_approve_temporary() {
   fi
 
   # Get current epoch only after establishing a trusted clock sample.
+  # קריאת אפוך נוכחי רק לאחר establishment of a trusted clock sample
   if ! current_epoch="$(date +%s)"; then
     stages_error "unable to read current epoch" "clock_unavailable"
     return 1
@@ -357,6 +394,7 @@ _stages_approve_temporary() {
   expires_at=$((current_epoch + ttl_seconds))
 
   # Step 1: Create pending record
+  # שלב 1: יצירת רשומת pending
   local pending_record
   if ! pending_record="$(stages_create_pending_record "$rule" "$expires_at" "$correlation_id")"; then
     return 1
@@ -373,11 +411,13 @@ _stages_approve_temporary() {
   fi
 
   # Step 2: Write pending to ttl.json
+  # שלב 2: כתיבת pending ל-ttl.json
   if ! stages_add_record "$pending_record" "$TTL_FILE"; then
     return 1
   fi
 
   # A live device and its future policy rule are separate USBGuard operations.
+  # התקן חי וממשת המדיניות העתידית הם פעולות נפרדות של USBGuard.
   if [[ -n "$device_id" ]] && ! approve_device "$device_id"; then
     if ! stages_update_status "$managed_id" "recovery_required" "$TTL_FILE"; then
       stages_error "device approval failed and TTL record could not be marked for recovery: ${STAGES_ERROR_CODE:-status_update_failed}" \
@@ -438,6 +478,8 @@ _stages_approve_temporary() {
 
 # Permanent approval transaction
 _stages_approve_permanent() {
+  # עסקת אישוי קבוע - בודקת תנאים מקדימים, מוסיפה חוק קבוע,
+  # ואם צוין התקן - מאשרת אותו. תומכת בסיווג שגיאות שונות.
   local rule="$1"
   local correlation_id="${2:-}"
   local device_id="${3:-}"
