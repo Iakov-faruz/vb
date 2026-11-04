@@ -124,14 +124,21 @@ Caller → approve_device() / add_temporary_rule() / add_permanent_rule() /
 
 ```
 usbguard-approval-manager/
-├── Makefile                          # Test runner: make test
+├── Makefile                          # Unit and integration test targets
 ├── README.md                         # Project overview & rules
+├── deploy.sh                         # Transactional installer
+├── deploy-lib.sh                     # Shared installer/rollback helpers
+├── deploy-uninstall.sh               # Safe code removal, preserving data
+├── validate_all.sh                   # Read-only health validation
 ├── conf/
 │   └── approval-manager.conf.example # Config: TTL, timeouts, paths
 ├── docs/
+│   ├── DEPLOYMENT.md                 # Install, validation and removal
 │   ├── lab-checklist.md              # Pre-lab entry criteria
 │   └── g01-preflight-report.md       # G-01 status & observations
+├── logrotate/                        # Audit rotation policy
 ├── scripts/
+│   ├── usb-revoke-interactive.sh     # No-argument sudo entry point
 │   └── lib/
 │       ├── atomic-write.py           # Atomic JSON writer
 │       ├── audit_write.py            # Audit logging
@@ -142,10 +149,12 @@ usbguard-approval-manager/
 │       ├── result.sh                 # Shared result model
 │       ├── time-guards.sh            # Calendar clock guards
 │       └── usbguard-policy.sh        # USBGuard adapter (857 lines)
-├── systemd/                          # Service unit files
+├── sudoers/                          # Restricted interactive entry points
+├── systemd/                          # TTL service and timer units
 └── tests/
     ├── integration/
     │   ├── collect_g01_readonly_preflight.sh
+    │   ├── run_integration_tests.sh  # Safe checks plus explicit lab gate
     │   └── test_g01_adapter.sh       # G-01 5-gate integration test
     └── unit/
         ├── test_atomic_write.py
@@ -160,9 +169,9 @@ usbguard-approval-manager/
         └── test_time_guards.sh
 ```
 
-## Entry Points for Higher Layers (Phase 3)
+## Entry Points for Higher Layers
 
-When Phase 3 components are built, they call usbguard-policy.sh functions:
+Phase 3 components call the adapter functions:
 
 ```
 stages.sh        → approve_device(), add_temporary_rule(), add_permanent_rule()

@@ -1,0 +1,2 @@
+%usbadmins ALL=(root) NOPASSWD: /usr/libexec/usbguard-approval-manager/usb-approve.sh ""
+%usbadmins ALL=(root) NOPASSWD: /usr/libexec/usbguard-approval-manager/usb-revoke-interactive.sh ""
