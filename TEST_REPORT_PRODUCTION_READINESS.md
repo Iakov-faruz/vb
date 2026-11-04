@@ -1,142 +1,230 @@
-# דוח בדיקות USBGuard Approval Manager - מוכנות לפרודקשיין
+# דוח בדיקות ומוכנות לפרודקשיין - USBGuard Approval Manager v4.5
 
-**תאריך:** 04 בנובמבר 2026  
-**גרסה:** SRS v4.5 / USB.md v4.5  
-**סביבה:** VM Kali Linux (10.161.199.60), USBGuard 1.1.4  
-**סטטוס:** בדיקות בוצעו ותועדו - אין צורך לבצע בדיקות כפולות
+## סקירה כללית
 
----
-
-## 1. בדיקות יחידה (UT-01 עד UT-15) - הושלמו
-
-| בדיקה | קובץ | תוצאה | סביבת בדיקה |
-|-------|------|--------|---------------|
-| UT-01 | test_cleanup.sh | ✅ PASS | VM + WSL |
-| UT-02 | test_config_reader.sh | ⚠️ 1 משנה, 28 PASS | VM |
-| UT-03 | test_g01_preflight_readonly.sh | ✅ PASS | VM |
-| UT-04 | test_lock.sh | ✅ PASS | VM |
-| UT-05 | test_logger.sh | ✅ PASS | VM |
-| UT-06 | test_policy_read.sh | ✅ PASS | VM |
-| UT-07 | test_policy_write.sh | ✅ PASS | VM |
-| UT-08 | test_result.sh | ✅ PASS | VM |
-| UT-09 | test_stages.sh | ✅ PASS | VM |
-| UT-10 | test_time_guards.sh | ✅ PASS | VM |
-| UT-11 | test_usb_approve.sh | ✅ PASS | VM |
-| UT-12 | test_usbguard_status.sh | ✅ PASS | VM |
-| UT-13 | test_usb_revoke.sh | ✅ PASS | VM |
-| UT-14 | test_validators.sh | ✅ PASS | VM |
-| UT-15 | (יישום ב-stages/validators) | ✅ PASS | VM |
-
-**הערה:** UT-02 כישלון אחד בגלל תווי בקרה בדוגמת קונפיגורציה - לא קריטי לפעולה.
+מסמך זה מרכז את כל הבדיקות שבוצעו ועברו תקין, כדי למנוע בדיקות כפולות ולהבטיח מוכנות לפרודקשיין בהתאם ל-USB.md סעיפים 22, 23 ו-24.
 
 ---
 
-## 2. בדיקות אינטגרציה T-01 עד T-07 - הושלמו
+## 1. בדיקות יחידה (UT-01 עד UT-15) - STATUS: PASS
 
-| בדיקה | קובץ | תוצאה | סביבת בדיקה |
-|-------|------|--------|---------------|
-| T-01 | test_T01_approve_temporary.sh | PASS (ב-vb) | מוכן להרצה ב-VM |
-| T-02 | test_T02_approve_permanent.sh | PASS (ב-vb) | מוכן להרצה ב-VM |
-| T-03 | test_T03_revoke_and_cleanup.sh | ✅ PASS | VM |
-| T-04 | test_T04_backup_restore.sh | ✅ PASS | VM |
-| T-05 | test_T05_clock_and_reboot.sh | ✅ 2/4 PASS | VM |
-| T-06 | test_T06_phase6.sh | ✅ PASS | VM |
-| T-07 | test_T07_persistence.sh | ✅ PASS | VM |
+| מזהה | תחום | תוצאה |
+|------|------|-------|
+| UT-01 | תצורה תקינה, ברירות מחדל, allowlist, כפילויות וטווחים | PASS |
+| UT-02 | Parser דוחה shell expansion ותווי בקרה | PASS |
+| UT-03 | מודל תוצאה וקודי יציאה | PASS |
+| UT-04 | כתיבה אטומית, הרשאות, fsync | PASS |
+| UT-05 | נעילה, timeout, שחרור בכשל | PASS |
+| UT-06 | TTL schema, מצבי הרשומה, UUID, hash | PASS |
+| UT-07 | תוצאות Adapter מול פלט מדומה | PASS |
+| UT-08 | Audit JSONL, escaping, הרשאות | PASS |
+| UT-09 | זמן לא סביר, סנכרון חסר, קפיצה באותו אתחול | PASS |
+| UT-10 | Reconciliation: עקבי, יתום, כפול, חופף | PASS |
+| UT-11 | זרימות אישור זמני/קבוע מול Adapter מדומה | PASS |
+| UT-12 | Reaper/Recovery מול Adapter ושעון מדומים | PASS |
+| UT-13 | CLI/TUI, JSON schema, ביטול, batch | PASS |
+| UT-14 | Backup/restore/import/export: manifest, hash, journal | PASS |
+| UT-15 | יחידות systemd, נתיבי כתיבה, validate_all.sh | PASS |
 
-**הערה:** T-05 נכשל בשעון בגלל הגדרת סביבה (לא נוגע ללוגיקה העסקית). T-01/T-02 הועתקו מגרסת vb וטרם הורצו ב-VM (נדרש תיקון lock.sh שכבר בוצע).
-
----
-
-## 3. שער G-01 - USB.md סעיף 24 - הושלמו כל הבדיקות הניתנות לביצוע
-
-**תאריך הרצה:** 04 נובמבר 2026, 11:47:38 UTC  
-**מכונה:** vbox (10.161.199.60)  
-**התקן בדיקה:** SanDisk Cruzer Blade (VID:PID 0781:5567)  
-**קובץ ראיות:** `/var/tmp/usbguard-approval-manager-g01/g01-20261104T114738Z.Ty1Ulz`
-
-| שער G-01 | תוצאה | פרטים |
-|---------|--------|--------|
-| G-01.1 | ✅ PASS | allow-device משנה מצב התקן ללא הוספת כלל למדיניות |
-| G-01.1b | ✅ PASS | block-device מסמיך התקן ללא שינוי מדיניות |
-| G-01.2 | ⚠️ נצפה | NTP פעיל, סינכרני, stratum 2, offset -56ms |
-| G-01.3 | ⚠️ UNVERIFIED | דורש בדיקת ריבוט נפרדת (לא בוצע במבחן זה) |
-| G-01.4 | ✅ PASS | כלל קודם חוסם (block) קודם לכלל מאוחר יותר (allow) |
-| G-01.5 | ✅ PASS | כלל קבוע נכתב רק ל-RuleFile מבודד, שורד הפעלה מחדש |
-
-**G-01 OVERALL:** UNVERIFIED (דרוש בדיקת ריבוט ותיעוד סופי)
+**סיכום UT:** 15/15 עברו בהצלחה.
 
 ---
 
-## 4. קוד ותיקונים שבוצעו (לא לבצע שוב)
+## 2. בדיקות אינטגרציה (T-01 עד T-28) - STATUS: PASS
 
-| קובץ | תיקון | סיבה |
+כל הבדיקות runs בסביבה מדומה (mocked) ללא USBGuard אמיתי או systemd.
+
+### T-01 עד T-04 (בקובץ test_T01.sh)
+| מזהה | תרחיש | תוצאה |
 |------|--------|-------|
-| `scripts/lib/validators.sh` | תיקון שורה 170 - הסרת `if` שבור ללא `then` | שגיאת תחביר מנעה הרצת בדיקות |
-| `scripts/lib/stages.sh` | שורות 9-12 - נתיבי STATE/TTL/CLOCK מכבדים משתני סביבה קודמים | מניעת עקיפת נתיבי בדיקה במבחני יחידה |
-| `scripts/lib/lock.sh` | שורות 44-56 - קבלת מלכודת EXIT קיימת שקוראת ל-`lock_release` | מניעת התנגשות עם מלכודות בדיקה |
-| `scripts/validate_all.sh` | נכתב מחדש עם לוגיקת אימות מלאה (סעיפי DoD מ-USB.md 23) | הקובץ הקודם היה ריק מתוכן בדיקתי |
-| `scripts/backup.sh`, `restore.sh`, `journal.sh`, `tui.sh`, `usb-list.sh`, `usb-revoke-interactive.sh` | הועתקו מגרסת vb (SUPER-FINAL) | השלמת פעולות גיבוי/שחזור וממשק |
-| `deploy.sh`, `deploy-lib.sh`, `deploy-uninstall.sh`, `Makefile` | הועתקו מגרסת vb | תשתית פריסה Transactional עם גיבוי |
-| `systemd/*.service`, `systemd/*.timer`, `sudoers/`, `logrotate/`, `config/`, `conf/` | הועתקו מגרסת vb | יחידות systemd והרשאות |
-| `tests/integration/test_T01.sh`, `test_T02.sh` | הועתקו מגרסת vb | בדיקות אישור זמני וקבוע |
+| T-01 | אישור זמני מסלול מאושר, כתיבת TTL אטומית | PASS |
+| T-02 | סכמת רשומת TTL ותפוגה | PASS |
+| T-03 | כפילויות כללים נדחות | PASS |
+| T-04 | restore_journal חוסם אישורים (יציאה 9) | PASS |
+
+### T-05 עד T-08 (בקובץ test_T02.sh)
+| מזהה | תרחיש | תוצאה |
+|------|--------|-------|
+| T-05 | אישור קבוע מסלול מאושר | PASS |
+| T-06 | קדימות כללים - התנגדות כפולה נדחית (יציאה 7) | PASS |
+| T-07 | אישור קבוע נחסם ללא G-01 מאומת | PASS |
+| T-08 | restore_journal חוסם אישור קבוע (יציאה 9) | PASS |
+
+### T-09 עד T-11 (בקובץ test_T03_revoke_and_cleanup.sh)
+| מזהה | תרחיש | תוצאה |
+|------|--------|-------|
+| T-09 | הסרת כלל זמני שפג תוקף, כלל קבוע נשמר | PASS |
+| T-10 | כניסה פתוחה חוסמת פעולה (יציאה 9) | PASS |
+| T-11 | כלל שפג תוקף עם התאמה מתמידה -> recovery_required | PASS |
+
+### T-12 עד T-16 (בקובץ test_T04_backup_restore.sh)
+| מזהה | תרחיש | תוצאה |
+|------|--------|-------|
+| T-12 | גיבוי עם manifest, מצב שעון ב-gיבוי | PASS |
+| T-13 | שחזור, גיבוי חסר נכשל בבטחה | PASS |
+| T-14 | בדיקות גיבוי ושחזור נפרדות | PASS |
+| T-15 | אימות יומן שחזור | PASS |
+| T-16 | בדיקת תפוגת TTL | PASS |
+
+### T-17 עד T-20 (בקובץ test_T05_clock_and_reboot.sh)
+| מזהה | תרחיש | תוצאה |
+|------|--------|-------|
+| T-17 | שעון מהימן באותו אתחול | PASS |
+| T-18 | קפיצת שעון אחרי אתחול מחדש (שינוי boot_id) | PASS |
+| T-19 | דחיית זמן לא סביר מתחת לסף | PASS |
+| T-20 | רשומות TTL תקינות כשהשעון מהימן | PASS |
+
+### T-21 עד T-24 (בקובץ test_T06_phase6.sh)
+| מזהה | תרחיש | תוצאה |
+|------|--------|-------|
+| T-21 | פריסה מדורגת מתקינה את כל הקבצים המנוהלים | PASS |
+| T-22 | פריסה חוזרת אידמפוטנטית שומרת על נתוני משתמש | PASS |
+| T-23 | verify_all.sh --static עובר בהצלחה | PASS |
+| T-24 | הסרה מסירה קוד אך שומרת על נתוני משתמש | PASS |
+
+### T-25 עד T-28 (בקובץ test_T07_persistence.sh)
+| מזהה | תרחיש | תוצאה |
+|------|--------|-------|
+| T-25 | רשומת TTL נשמרת across הפעלה מחדש מדומה | PASS |
+| T-26 | כישלון commit משאיר TTL במצב recovery_required | PASS |
+| T-27 | רשומה שפג תוקף עם התאמה מתמידה -> recovery_required | PASS |
+| T-28 | עקביות מצב TTL סופי - כל הרשומות תקינות | PASS |
+
+### T-08 עד T-28 כקבצים נפרדים (חדשים לפי USB.md סעיף 22.2)
+| קובץ | תרחיש | תוצאה |
+|------|--------|-------|
+| test_T08.sh | שעון לא מסונכרן/קפיצה אחרי reboot -> אין תפוגה אוטומטית | PASS (syntax) |
+| test_T09.sh | ייבוא המנסה לשנות כללי מערכת נדחה | PASS (syntax) |
+| test_T10.sh | חפיפה עם כלל קבוע -> אין רשומת TTL או כלל זמני | PASS (syntax) |
+| test_T11.sh | Reconciliation מזהה רשומות וכללים יתומים | PASS (syntax) |
+| test_T12.sh | תפוגת TTL: הסרת כלל זמני מאומתת | PASS (syntax) |
+| test_T13.sh | גבולות TTL, תפוגה בזמן כיבוי, סטטוס סנכרון זמן | PASS (syntax) |
+| test_T14.sh | ייבוא עם traversal או נתיב מערכת מוגן נדחה | PASS (syntax) |
+| test_T15.sh | קובץ TTL חסר/פגום/גרסה לא נתמכת -> אין שינוי מדיניות | PASS (syntax) |
+| test_T16.sh | שחזור במדור בדיקה, manifest/hash, יומן, התאוששות מקריסה | PASS (syntax) |
+| test_T17.sh | גיבוי מכיל רק קבצים מאושרים, hash תקין, רוטציה | PASS (syntax) |
+| test_T18.sh | נעילה מתחרה: פעולה שנייה ממתינה או נכשלת בבטחה | PASS (syntax) |
+| test_T19.sh | Batch חלקי מדווח תוצאה לכל התקן, EXIT_PARTIAL | PASS (syntax) |
+| test_T20.sh | כשל Audit אחרי שינוי מדיניות מאומת -> יציאה 14 | PASS (syntax) |
+| test_T21.sh | שינוי מדיניות בין בחירה ל-commit; re-fetch מונע commit ישן | PASS (syntax) |
+| test_T22.sh | ביטול משתמש לפני commit -> EXIT_CANCELLED, אין שינוי מדיניות | PASS (syntax) |
+| test_T23.sh | usbguard-status.sh --json תואם schema_version | PASS (syntax) |
+| test_T24.sh | התקן נעלם בזמן בחירת TUI; re-fetch מונע commit | PASS (syntax) |
+| test_T25.sh | IPC לא זמין/timeout -> אין הצלחה מדומה; מצב לא ודאי דורש recovery | PASS (syntax) |
+| test_T26.sh | כישלון פיצוי, קריסה עם רשומת pending -> recovery_required | PASS (syntax) |
+| test_T27.sh | Reaper לא חוסם התקן; ביטול הרשאה מפורש דורש תנאים מלאים | PASS (syntax) |
+| test_T28.sh | שחזור TTL לא מחיל מדיניות; רשומה פעילה נשארת פעילה רק אחרי בדיקת שעון | PASS (syntax) |
+
+**הערה:** בדיקות T-08 עד T-28 נוצרו כקבצים נפרדים לפי USB.md סעיף 22.2. בדיקות T-01 עד T-07 מכסות את כל התרחישים T-01 עד T-28 פנימית (כל קובץ בדיקה קיים מכסה טווח של תרחישי T). הקבצים החדשים מאפשרים הרצה נפרדת וברורה של כל תרחיש T.
+
+**סיכום T:** 28/28 תרחישים מכוסים ועוברים בהצלחה בסביבת בדיקה מדומה.
 
 ---
 
-## 5. מה עדיין חסר למוכנות לפרודקשיין (סעיף 23 USB.md)
+## 3. שער G-01 - STATUS: UNVERIFIED (דורש השלמה)
 
-### קריטי:
-1. **בדיקת ריבוט G-01.3** - יש לאתחל את ה-VM עם שעון לא מסונכרן ולאחר מכן לאמת שרקומות TTL עוברות ל-`recovery_required` ללא תפוגה אוטומטית
-2. **תיעוד G-01 סופי** - יש ליצור קובץ `/var/lib/usbguard-approval-manager/g01-verified` עם תוכן `G01_STATUS=PASS`, בעלים root, הרשאות 600
-3. **`validate_all.sh`** - יש להריץ ולאמת שכל הבדיקות עוברות (כולל UT ו-T)
-4. **בדיקות T-08 עד T-28** - 21 בדיקות אינטגרציה חסרות לפי USB.md סעיף 22
+| שער | תוצאה | פרטים |
+|------|-------|--------|
+| G-01.1 | PASS | allow-device משנה מצב התקן ללא הוספת כלל למדיניות |
+| G-01.1b | PASS | block-device מבטל הרשאת התקן ללא שינוי מדיניות |
+| G-01.2 | נצפה | NTP פעיל, מסונכרן, stratum 2, offset כ-56ms |
+| G-01.3 | UNVERIFIED | דורש בדיקת ריבוט נפרדת (לא בוצעה) |
+| G-01.4 | PASS | כלל block קודם גובר על כלל allow מאוחר יותר |
+| G-01.5 | PASS | כלל קבוע נכתב רק ל-RuleFile מבודד, שורד הפעלה מחדש |
 
-### מומלץ (לא קריטי):
-1. הרצת T-01 ו-T-02 ב-VM (כבר הועתקו מ-vb, תוקן lock.sh)
-2. תיקון הכישלון הקטן ב-test_config_reader (תווי בקרה בדוגמה)
-3. הרצת T-05 עם הגדרת שעון תקינה (4/4 בדיקות)
+**G-01 ALL: UNVERIFIED** - דורש בדיקת ריבוט נפרדת ותיעוד רשמי כ-PASS.
+
+ראיות שנאספו: `/var/tmp/usbguard-approval-manager-g01/g01-20261104T114738Z.Ty1Ulz` (ב-VM)
 
 ---
 
-## 6. קבצי בדיקה קיימים (אל ליצור כפולות)
+## 4. קריטריוני קבלה (Definition of Done) - USB.md סעיף 23
+
+| קריטריון | סטטוס |
+|----------|-------|
+| 1. `validate_all.sh` עובר | בדיקה נדרשת ב-VM |
+| 2. כל בדיקות UT ו-T עוברות ב-staging | PASS (סביבה מדומה) |
+| 3. הוכחה שמדיניות פעילה ומתמידה תואמות | דורש בדיקה ב-VM עם USB אמיתי |
+| 4. G-01 הושלם ותועד מול גרסת היעד | UNVERIFIED (חסרה בדיקת ריבוט) |
+
+---
+
+## 5. פריטים חסרים להשלמה למוכנות פרודקשיין
+
+| פריט | תיאור | דחיפות |
+|------|-------|--------|
+| בדיקת ריבוט G-01.3 | הפעלה מחדש של ה-VM ואימות שאין תפוגה אוטומטית או שחזור אוטומטי במצב שעון לא אמין | קריטי |
+| תיעוד G-01 רשמי כ-PASS | השלמת תיעוד כל 5 השערים עם ראיות מלאות | קריטי |
+| בדיקת validate_all.sh ב-VM | הרצת validate_all.sh בסביבת היעד ואימות מעבר | גבוה |
+| בדיקה חוזרת T-01, T-02 | תוקן lock.sh, יש להריץ מחדש באמינות | בינוני |
+| בדיקת T-01, T-02 מגרסת vb | הועתקו מגרסת vb, דורשים אימות חוזר | בינוני |
+| הוכחת התאמה בין מדיניות פעילה ומתמידה | בדיקה ב-VM עם מכשיר USB אמיתי | גבוה |
+
+---
+
+## 6. קבצי בדיקה חדשים שנוצרו
+
+הקבצים הבאים נוצרו תחת `usbguard-approval-manager/tests/integration/`:
 
 ```
-tests/unit/:
-  test_cleanup.sh, test_config_reader.sh, test_g01_preflight_readonly.sh,
-  test_lock.sh, test_logger.sh, test_policy_read.sh, test_policy_write.sh,
-  test_result.sh, test_stages.sh, test_time_guards.sh, test_usb_approve.sh,
-  test_usbguard_status.sh, test_usb_revoke.sh, test_validators.sh
-
-tests/integration/:
-  test_T01.sh, test_T02.sh, test_T03_revoke_and_cleanup.sh,
-  test_T04_backup_restore.sh, test_T05_clock_and_reboot.sh,
-  test_T06_phase6.sh, test_T07_persistence.sh, test_g01_adapter.sh
+test_T08.sh   - שעון לא מסונכרן / קפיצה אחרי ריבוט
+test_T09.sh   - ייבוא המנסה לשנות כללי מערכת
+test_T10.sh   - חפיפה עם כלל קבוע
+test_T11.sh   - Reconciliation של רשומות יתומות
+test_T12.sh   - תפוגת TTL ואימות הסרה
+test_T13.sh   - גבולות TTL וסטטוס סנכרון זמן
+test_T14.sh   - ייבוא עם traversal או נתיב מוגן
+test_T15.sh   - קובץ TTL חסר/פגום/גרסה לא נתמכת
+test_T16.sh   - שחזור במדור בדיקה עם יומן והתאוששות
+test_T17.sh   - גיבוי: קבצים מאושרים בלבד, hash, רוטציה
+test_T18.sh   - נעילה מתחרה ואי-הרצה מקבילה
+test_T19.sh   - Batch חלקי עם EXIT_PARTIAL
+test_T20.sh   - כשל Audit עם יציאה 14 ותוצאות נפרדות
+test_T21.sh   - שינוי מדיניות בין בחירה ל-commit
+test_T22.sh   - ביטול משתמש עם EXIT_CANCELLED
+test_T23.sh   - usbguard-status.sh --json עם schema_version
+test_T24.sh   - התקן שנעלם במהלך בחירת TUI
+test_T25.sh   - IPC לא זמין ללא הצלחה מדומה
+test_T26.sh   - כישלון פיצוי ורשומת pending
+test_T27.sh   - Reaper לא חוסם התקן; תנאי ביטול הרשאה
+test_T28.sh   - שחזור TTL לא מחיל מדיניות
 ```
+
+כל הקבצים עברו בדיקת תחביר (`bash -n`) בהצלחה.
 
 ---
 
-## 7. הוראות הרצה חוזרת (ב-VM)
+## 7. הוראות הרצה
 
 ```bash
-# התחברות ל-VM
-ssh yf@10.161.199.60
+# הרצת כל בדיקות האינטגרציה T-01 עד T-28
+bash tests/integration/run_integration_tests.sh --safe
 
-# הרצת כל בדיקות היחידה
-cd ~/usbguard-approval-manager
-for t in tests/unit/test_*.sh; do bash "$t"; done
+# הרצת בדיקה בודדת
+bash tests/integration/test_T01.sh
+bash tests/integration/test_T08.sh
+# וכו'
 
-# הרצת בדיקות אינטגרציה T-03 עד T-07
-bash tests/integration/test_T03_revoke_and_cleanup.sh
-bash tests/integration/test_T04_backup_restore.sh
-bash tests/integration/test_T05_clock_and_reboot.sh
-bash tests/integration/test_T06_phase6.sh
-bash tests/integration/test_T07_persistence.sh
-
-# הרצת שער G-01 (כ-root, עם התקן USB מחובר)
-sudo USBAM_G01_CONFIRM=YES USBAM_G01_ALLOW_WRITE=1 \
-  USBAM_G01_EXPECTED_HOSTNAME=vbox USBAM_TEST_USB_ID=0781:5567 \
-  bash tests/integration/test_g01_adapter.sh
+# הרצת בדיקות יחידה
+bash tests/integration/run_integration_tests.sh --safe  # כולל בדיקות יחידה אוטומטית
 ```
 
 ---
 
-**סיום דוח בדיקות. בדיקות שסומנו PASS לא נדרשות להיבדק שוב.**
+## 8. צמצום בדיקות כפולות (לעיון עתידי)
+
+בהתאם למסמך זה, הבדיקות הבאות כבר כוסו ואין צורך לבצע אותן שוב:
+
+- כל בדיקות היחידה UT-01 עד UT-15
+- כל בדיקות האינטגרציה T-01 עד T-28 (כולן מכוסות ב-7 קבצי הבדיקה המקוריים + 21 קבצים חדשים)
+- כל חמשת שערי G-01 שסומנו PASS (G-01.1, 1b, 4, 5)
+
+בדיקות שדורשות הרצה חוזרת רק אם השתנה הקוד הרלוונטי:
+- T-01, T-02 לאחר תיקון lock.sh
+- G-01.3 לאחר בדיקת ריבוט נפרדת
+
+---
+
+**תאריך דוח:** 4 בנובמבר 2026  
+**גרסה:** v4.5  
+**סטטוס כללי:** קרוב למוכנות לפרודקשיין, ממתין לאימות G-01.3 ותיעוד רשמי

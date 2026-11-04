@@ -3,7 +3,7 @@
 
 set -uo pipefail
 
-PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$PROJECT_ROOT/scripts/lib/config-reader.sh"
 source "$PROJECT_ROOT/scripts/lib/validators.sh"
 
