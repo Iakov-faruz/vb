@@ -168,6 +168,8 @@ check_configuration() {
 }
 
 check_units_and_policy_files() {
+  # בודקת יחידות systemd,מדיניות sudoers, logrotate וקבצי ספרייה
+  # מאמתת זכויות, הרשאות, הגדרות נוקשה (ProtectSystem) וסינטקס של יחידות
   local service timer sudoers logrotate
   service="$(path_for "/etc/systemd/system/$SERVICE_UNIT")"
   timer="$(path_for "/etc/systemd/system/$TIMER_UNIT")"
@@ -228,7 +230,7 @@ check_units_and_policy_files() {
   config_example="$(path_for "$CONFIG_CONF_REL")"
   check_file "config example" "$CONFIG_CONF_REL" 600 root || true
 
-  for lib_file in journal.sh tui.sh usb-list.sh backup.sh restore.sh cleanup-expired.sh; do
+  for lib_file in journal.sh tui.sh backup.sh restore.sh cleanup-expired.sh; do
     check_file "executable $lib_file" "$LIBEXEC_DIR/$lib_file" 750 root || true
   done
   for lib_file in journal.sh tui.sh; do
@@ -286,6 +288,7 @@ check_units_and_policy_files() {
 }
 
 check_ttl_state() {
+  # בודקת מצב TTL - מאמתת תיקיית מצב, קובץ TTL JSON ותקינות המבנה שלו
   local state ttl
   state="$(path_for "$STATE_DIR")"
   ttl="$state/ttl.json"
@@ -300,6 +303,7 @@ check_ttl_state() {
 }
 
 check_backup_directory() {
+  # בודקת תיקיית גיבויים - מאמתת זמינות, סיבוב (rotation) ותקינות של ארכיונים
   local backup_path keep count file mode owner expected backup_status=0
   local lifecycle_helper
   backup_path="$(path_for "$BACKUP_DIR")"
@@ -345,6 +349,8 @@ check_backup_directory() {
 }
 
 check_runtime() {
+  # בודקת ריצה - מאמתת תנאי הפעלה בזמן אמת: נוכלות Root, תיקיות לוג, קובץ נעילה,
+  # סטטוס timer, חיבור IPC ל-USBGuard וסידור גיבויים
   local timeout_seconds ipc_rc timer_rc result start_timestamp
   local service_path log_dir audit_file lock_file
   if (( EUID != 0 )) && [[ "$ROOT" == "/" ]]; then
@@ -399,6 +405,7 @@ main() {
   printf '=== USBGuard Approval Manager health validation%s ===\n' \
     "$([[ "$STATIC_ONLY" == 1 ]] && printf ' (static-only)')"
 
+  # הפעלת בדיקות שונות: הגדרות, מצב TTL, תיקיית גיבויים, יחידות מדיניות וקובץ נעילה
   check_configuration || true
   check_ttl_state || true
   check_directory "backup directory" "$BACKUP_DIR" 700 root || true

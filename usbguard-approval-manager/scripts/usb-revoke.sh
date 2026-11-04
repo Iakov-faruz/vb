@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# usb-revoke.sh - Explicit revoke flow (SRS v4.5 Section 14.2, FR-27, T-27)
-# Separate admin tool, NOT part of Reaper, requires interactive confirmation
-# Only works with expired TTL record, fresh device ID, lock, re-fetch, G-01 verification
+# usb-revoke.sh - זריחת גלוי מפורש (SRS v4.5 Section 14.2, FR-27, T-27)
+# כלי נפרד למנהל, אינו חלק מה-Reaper, דורשת אישור אינטראקטיבי
+# פועלת רק עם רשומת TTL פג תוקף, מזהה מכשיר טרי, נעילה, re-fetch, אימות G-01
 
 set -euo pipefail
 
@@ -56,9 +56,13 @@ This tool:
 Exit codes:
   0 success, 1 operational failure, 7 validation, 9 inconsistent, 130 cancelled
 EOF
+  # הסבר: מציג אפשרויות שורת פקודה. הכלי פועל רק עם רשומות TTL פגות תוקף,
+  # דורש מזהה מכשיר מרשימת ההתקנים הנוכחית, ואישור אינטראקטיבי.
+  # אינה משנה ttl.json - הרשומה הפגה נותרת final.
 }
 
 parse_args() {
+  # פותח ארגומנטים מהשורה הפקודה
   while (( $# )); do
     case "$1" in
       --managed-id)
@@ -93,6 +97,7 @@ parse_args() {
     esac
   done
 
+  # אימות ש-Necessary args ניתנו
   if [[ -z "$MANAGED_ID" || -z "$DEVICE_ID" ]]; then
     printf 'ERROR: --managed-id and --device are required\n' >&2
     usage >&2
@@ -119,6 +124,8 @@ log_error() {
 }
 
 confirm_interactive() {
+  # מאשרת אינטראקטיבית - אם dry-run, מדפסת הודעה וחוזרת הצלחה.
+  # בודקת אם stdin הוא tty ומבקשת אישור y/N מהמשתמש
   local prompt="$1"
   local answer
   if [[ "$DRY_RUN" == "1" ]]; then

@@ -1,0 +1,22 @@
+[Unit]
+Description=USBGuard Approval Manager TTL reconciliation and expiry
+After=usbguard.service
+Wants=usbguard.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/libexec/usbguard-approval-manager/cleanup-expired.sh
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=true
+NoNewPrivileges=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX
+ReadWritePaths=/var/lib/usbguard-approval-manager
+ReadWritePaths=/var/log/usbguard-approval-manager
+ReadWritePaths=/run/lock/usbguard-approval-manager.lock
+
+[Install]
+WantedBy=multi-user.target

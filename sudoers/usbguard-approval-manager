@@ -1,0 +1,14 @@
+%usbadmins ALL=(root) NOPASSWD: /usr/libexec/usbguard-approval-manager/usb-approve.sh ""
+%usbadmins ALL=(root) NOPASSWD: /usr/libexec/usbguard-approval-manager/usb-revoke-interactive.sh ""
+
+# --- הסבר בעברית ---
+# הרשאות sudo למשתמשים בקבוצת usbadmins.
+# מאפשרים הפעלתスクリプטים של usbguard ללא סיסמה:
+#   - usb-approve.sh: לאישור התקני USB
+#   - usb-revoke-interactive.sh: לביטול אישור אינטראקטיבי
+#
+# --- English explanation ---
+# sudo privileges for usbadmins group.
+# Allows running usbguard scripts without password:
+#   - usb-approve.sh: for USB device approval
+#   - usb-revoke-interactive.sh: for interactive revocation

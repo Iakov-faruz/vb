@@ -1,0 +1,22 @@
+[Unit]
+Description=USBGuard Approval Manager - Reaper (cleanup expired)
+After=usbguard.service
+Wants=usbguard.service
+ConditionPathExists=/usr/libexec/usbguard-approval-manager/scripts/cleanup-expired.sh
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/usbguard-approval-manager/scripts/cleanup-expired.sh
+User=root
+Group=root
+# Hardening
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+ReadWritePaths=/var/lib/usbguard-approval-manager /var/backups/usbguard-approval-manager /run/lock
+# No auto block-device - reaper only removes expired rules via remove-rule
+# SEC-18/19: Reaper never calls block-device
+
+[Install]
+WantedBy=multi-user.target

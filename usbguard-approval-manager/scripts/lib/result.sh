@@ -2,6 +2,27 @@
 # scripts/lib/result.sh
 # USBGuard Approval Manager — Error / Result Model
 #
+# --- הסבר בעברית ---
+# מודל תוצאות/שגיאות משותף (SRS §21, SEC-16).
+# מגדיר קודי יציאה (EXIT_*), מצבי תוצאה (RESULT_*), ופונקציות לניהול
+# state גלובלי (RESULT_STATE, RESULT_EXIT_CODE, RESULT_DETAIL, ...),
+# והדפסת JSON סופי (result_print_json).
+# משמש כל סקריפט להחזרת תוצאה עקיבה ו-exit codes תקניים.
+#
+# קודי יציאה:
+#   0=OK, 1=operation failure, 7=validation, 9=inconsistent/recovery, 13=partial/cancelled, 14=audit.
+#
+# פונקציות עיקריות:
+#   result_start                      - איפוס state ל-RESULT_SUCCESS
+#   result_set <state> <exit> [detail]- קביעת state/exit/detail
+#   result_success/policy_failed/...  - קיצורי state
+#   result_add_item ...               - הוספת item ל-JSON
+#   result_print_json                 - הדפסת JSON
+#   result_exit                       - exit עם RESULT_EXIT_CODE
+"
+# scripts/lib/result.sh
+# USBGuard Approval Manager — Error / Result Model
+#
 # Shared operation outcomes, JSON results, and exit codes (SRS section 21 and SEC-16).
 #
 # Exit codes:
@@ -53,6 +74,8 @@ if [[ "$(declare -p RESULT_MODEL_LOADED 2>/dev/null || true)" != \
   declare -gr RESULT_MODEL_LOADED=1
 fi
 
+# --- תוצאה: איפוס state ---
+# מאפס את כל שדות RESULT_* לברירת מחדל (success, exit 0).
 result_start() {
   RESULT_CORRELATION_ID=""
   RESULT_STATE="$RESULT_SUCCESS"
@@ -65,6 +88,7 @@ result_start() {
   RESULT_ITEM_JSON=()
 }
 
+# --- תוצאה: בדיקת מיפוי state/exit ---
 result_mapping_supported() {
   case "$1:$2" in
     "$RESULT_SUCCESS:$EXIT_OK"|\
@@ -80,6 +104,7 @@ result_mapping_supported() {
   esac
 }
 
+# --- תוצאה: state מדיניות תקין ---
 result_policy_status_supported() {
   case "$1" in
     applied|not_applied|unknown|not_applicable) return 0 ;;
@@ -87,6 +112,7 @@ result_policy_status_supported() {
   esac
 }
 
+# --- תוצאה: state audit תקין ---
 result_audit_status_supported() {
   case "$1" in
     written|failed|not_applicable) return 0 ;;
@@ -94,6 +120,7 @@ result_audit_status_supported() {
   esac
 }
 
+# --- תוצאה: סטטוסי item תקינים ---
 result_item_statuses_supported() {
   local state="$1"
   local policy_status="$2"
@@ -118,6 +145,8 @@ result_item_statuses_supported() {
   esac
 }
 
+# --- תוצאה: קביעת state/exit/detail ---
+# מאמת מיפוי, מעדכן גלובלים.
 result_set() {
   local state="$1"
   local exit_code="$2"
@@ -172,52 +201,64 @@ result_set() {
   esac
 }
 
+# --- תוצאה: getter state ---
 result_get_state() {
   printf '%s\n' "$RESULT_STATE"
 }
 
+# --- תוצאה: getter exit code ---
 result_get_exit_code() {
   printf '%s\n' "$RESULT_EXIT_CODE"
 }
 
+# --- תוצאה: getter detail ---
 result_get_detail() {
   printf '%s\n' "$RESULT_DETAIL"
 }
 
+# --- תוצאה: success ---
 result_success() {
   result_set "$RESULT_SUCCESS" "$EXIT_OK" "${1:-}"
 }
 
+# --- תוצאה: policy applied ---
 result_policy_applied() {
   result_set "$RESULT_SUCCESS" "$EXIT_OK" "${1:-}"
   RESULT_POLICY_STATUS="applied"
   RESULT_AUDIT_STATUS="written"
 }
 
+# --- תוצאה: operation failed ---
 result_operation_failed() {
   result_set "$RESULT_OPERATION_FAILED" "$EXIT_OPERATION" "${1:-}"
 }
 
+# --- תוצאה: validation failed ---
 result_validation_failed() {
   result_set "$RESULT_VALIDATION_FAILED" "$EXIT_VALIDATION" "${1:-}"
 }
 
+# --- תוצאה: policy failed ---
 result_policy_failed() {
   result_set "$RESULT_POLICY_FAILED" "$EXIT_OPERATION" "${1:-}"
 }
 
+# --- תוצאה: policy applied but audit failed ---
 result_policy_applied_audit_failed() {
   result_set "$RESULT_POLICY_APPLIED_AUDIT_FAILED" "$EXIT_AUDIT" "${1:-}"
 }
 
+# --- תוצאה: unknown policy outcome ---
 result_unknown() {
   result_set "$RESULT_UNKNOWN" "$EXIT_INCONSISTENT" "${1:-}"
 }
 
+# --- תוצאה: recovery required ---
 result_recovery_required() {
   result_set "$RESULT_RECOVERY_REQUIRED" "$EXIT_INCONSISTENT" "${1:-}"
 }
 
+# --- תוצאה: partial (batch) ---
 result_partial() {
   local detail="${1:-}"
   local policy_status="${2:-unknown}"
@@ -238,6 +279,7 @@ result_partial() {
   RESULT_AUDIT_DETAIL_CODE="$audit_detail_code"
 }
 
+# --- תוצאה: add item to JSON array ---
 result_add_item() {
   if (( $# < 6 || $# > 8 )); then
     printf 'result: ERROR: per-item result requires 6 to 8 arguments\n' >&2
@@ -274,14 +316,17 @@ result_add_item() {
   RESULT_ITEM_JSON+=("$item_json")
 }
 
+# --- תוצאה: cancelled ---
 result_cancelled() {
   result_set "$RESULT_CANCELLED" "$EXIT_CANCELLED" "${1:-}"
 }
 
+# --- תוצאה: exit with RESULT_EXIT_CODE ---
 result_exit() {
   exit "$RESULT_EXIT_CODE"
 }
 
+# --- תוצאה: JSON escape ---
 result_json_escape() {
   local LC_ALL=C
   local value="$1"
@@ -314,6 +359,7 @@ result_json_escape() {
   printf '%s' "$escaped"
 }
 
+# --- תוצאה: optional string JSON ---
 result_json_optional_string() {
   local value="$1"
   if [[ -z "$value" ]]; then
@@ -323,6 +369,7 @@ result_json_optional_string() {
   fi
 }
 
+# --- תוצאה: הדפסת JSON ---
 result_print_json() {
   local state detail correlation_id policy_status audit_status
   local policy_detail_code audit_detail_code item_json

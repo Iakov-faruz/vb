@@ -1,0 +1,11 @@
+[Unit]
+Description=Run USBGuard Approval Manager TTL every five minutes
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+Unit=usbguard-approval-ttl.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

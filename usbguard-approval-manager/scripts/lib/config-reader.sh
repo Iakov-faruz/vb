@@ -1,5 +1,19 @@
 #!/usr/bin/env bash
 # Secure, data-only reader for the approved SRS v4.5 configuration keys.
+#
+# --- הסבר בעברית ---
+# קורא תצורה מאובטח (data-only) למפתחות SRS v4.5.
+# קורא קובץ config (key=value), מאמת keys/types/ranges, ממלא defaults.
+# תומך integer + enum. דוחה NUL, control chars, unknown/duplicate keys.
+#
+# פונקציות:
+#   load_config <file>      - טעינה ואימות; ממלא CONFIG_VALUES
+#   get_config <key>        - הדפסת ערך (0=ok, 1=missing)
+#   config_trim / normalize / decimal_less_than - עזרי עיבוד
+#
+# CONFIG_KEY_SPECS מגדיר type|default|min|max לכל key.
+"
+# Secure, data-only reader for the approved SRS v4.5 configuration keys.
 
 if [[ "$(declare -p CONFIG_READER_LOADED 2>/dev/null || true)" != \
   "declare -r CONFIG_READER_LOADED="* ]]; then
@@ -18,12 +32,14 @@ if [[ "$(declare -p CONFIG_READER_LOADED 2>/dev/null || true)" != \
   declare -gr CONFIG_READER_LOADED=1
 fi
 
+# --- config: הדפסת שגיאה ---
 config_error() {
   local line_number="$1"
   shift
   printf 'config-reader: ERROR: line %s: %s\n' "$line_number" "$*" >&2
 }
 
+# --- config: נרמול עשרוני (הסרת אפסים מובילים) ---
 config_normalize_decimal() {
   local value="$1"
   while [[ "${#value}" -gt 1 && "${value:0:1}" == "0" ]]; do
@@ -32,6 +48,7 @@ config_normalize_decimal() {
   printf '%s' "$value"
 }
 
+# --- config: השוואת עשרוניים (a < b) ---
 config_decimal_less_than() {
   local left right
   left="$(config_normalize_decimal "$1")"
@@ -46,6 +63,7 @@ config_decimal_less_than() {
   [[ "$left" < "$right" ]]
 }
 
+# --- config: trim רווחים ---
 config_trim() {
   local value="$1"
 
@@ -59,6 +77,8 @@ config_trim() {
   printf '%s' "$value"
 }
 
+# --- config: טעינה ואימות ---
+# קורא קובץ, מאמת keys/types/ranges, ממלא defaults ל-CONFIG_VALUES.
 load_config() {
   local LC_ALL=C
   local file_path line_number raw_line key value spec
@@ -179,6 +199,7 @@ load_config() {
   done
 }
 
+# --- config: קבלת ערך ---
 get_config() {
   if [[ "$#" -ne 1 || -z "$1" ]]; then
     printf 'config-reader: ERROR: get_config requires one key\n' >&2

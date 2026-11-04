@@ -1,0 +1,9 @@
+/var/log/usbguard-approval-manager/audit.jsonl {
+    daily
+    rotate 90
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 root usbadmins
+}

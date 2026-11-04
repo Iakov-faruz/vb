@@ -68,6 +68,11 @@ def validate_json_document(document: str) -> None:
 
 
 def _create_temp_file(directory_fd: int, target_name: str) -> tuple[int, str]:
+    """Create a unique temporary file in the target directory.
+
+    Uses O_EXCL to avoid race conditions with existing files.
+    Retries up to TEMP_ATTEMPTS times to find a unique name.
+    """
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     flags |= getattr(os, "O_NOFOLLOW", 0)
 
@@ -94,7 +99,11 @@ def _create_temp_file(directory_fd: int, target_name: str) -> tuple[int, str]:
 
 
 def atomic_write_json(target_path: str | os.PathLike[str], document: str) -> None:
-    """Validate and atomically replace target_path with the provided JSON."""
+    """Validate and atomically replace target_path with the provided JSON.
+
+    The write is atomic: either the new file completely replaces the old one,
+    or the original file is left untouched. Uses O_EXCL temp file + rename.
+    """
     validate_json_document(document)
     try:
         payload = document.encode("utf-8")
@@ -172,6 +181,7 @@ def atomic_write_json(target_path: str | os.PathLike[str], document: str) -> Non
 
 
 def _parse_args(arguments: list[str]) -> argparse.Namespace:
+    """Parse command-line arguments for the atomic-write utility."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--file", required=True, help="target file path")
     parser.add_argument("--data", help="JSON document to write")

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Interactive and CLI approval entry point (SRS v4.5, Sections 12 and 15).
+# נקודת כניסה אינטראקטיבית ו- CLI לאישור (SRS v4.5, Sections 12 and 15).
+# מאפשר אישור מכשירי USB בבדיקת TTL זמני או קבוע, עם אפשרות dry-run.
+# נדרשת הרשאת root לשינויים במדיניות.
 
 set -uo pipefail
 umask 077
@@ -42,12 +44,15 @@ usage() {
   cat <<EOF
 Usage: $0 --device <ID> [--device <ID> ...] --type <permanent|temporary>
           [--ttl <seconds>] [--dry-run] [--help]
-       $0 [--type <permanent|temporary> [--ttl <seconds>]] [--dry-run]
+   $0 [--type <permanent|temporary> [--ttl <seconds>]] [--dry-run]
 
 Without --device, select blocked devices interactively with whiptail.
 Temporary approvals use TEMP_TTL_SECONDS when --ttl is omitted.
 Dry-run performs read-only queries and does not change policy, TTL, Audit, or state.
 EOF
+  # הסבר: מציג את אפשרויות השורה הפקודה. ללא --device, בחירה אינטראקטיבית
+  # של מכשירים חסומים באמצעות whiptail. אישורים זמניים משתמשים ב-TEMP_TTL_SECONDS
+  # כאשר --ttl לא צוין. dry-run מבצע שאילתות לקריאה בלבד ואינו משנה מדיניות.
 }
 
 validation_error() {
@@ -65,6 +70,7 @@ operation_error() {
 }
 
 parse_args() {
+  # פותח ארגומנטים מהשורה הפקודה
   while (( $# )); do
     case "$1" in
       --device)
@@ -108,6 +114,10 @@ parse_args() {
     esac
   done
 
+  # אימות הדדי של ארגומנטים - TTL תקף רק לאישורים זמניים,
+  # TTL חייב להיות בטווח 60-2592000 שניות,
+  # --type נדרש כאשר --device specified,
+  # בחירה אינטראקטיבית דורשת טרמינל
   if [[ -n "$TTL_SECONDS" && "$APPROVAL_TYPE" == "permanent" ]]; then
     validation_error "--ttl is valid only for temporary approvals"
   fi
@@ -124,6 +134,7 @@ parse_args() {
 }
 
 load_approval_config() {
+  # טוען הגדרות אישור - אם קובץ קיים, טוען אותו; אחרת מגדיר ערכים ברירת מחדל ממפתחי CONFIG_KEY_SPECS
   if [[ -e "$CONFIG_PATH" || -L "$CONFIG_PATH" ]]; then
     if [[ -L "$CONFIG_PATH" || ! -f "$CONFIG_PATH" ]] ||
       ! load_config "$CONFIG_PATH"; then
@@ -153,6 +164,8 @@ load_approval_config() {
 }
 
 collect_blocked_devices() {
+  # אוסף מכשירים חסומים - מרשימת המכשירים החסומים של USBGuard,
+  # ממיר כל רשומת block לרישיון allow ומבצעת אימות תקינות
   if ! list_blocked_devices; then
     operation_error "unable to retrieve blocked USBGuard devices"
   fi
@@ -170,7 +183,7 @@ collect_blocked_devices() {
     if ! usbguard_validate_rule "$device_rule"; then
       operation_error "blocked device cannot be converted to a safe allow rule"
     fi
-    if [[ -n "${SELECTED_RULES[$device_id]+present}" ]]; then
+    if [[ -n "${SELECTED_RULES[$device_id]+present}" ]; then
       operation_error "USBGuard returned duplicate device IDs"
     fi
     SELECTED_RULES["$device_id"]="$device_rule"
@@ -178,6 +191,8 @@ collect_blocked_devices() {
 }
 
 select_devices_interactively() {
+  # בחירה אינטראקטיבית של מכשירים - באמצעות whiptail מציג רשימת מכשירים חסומים
+  # ומאפשר בחירה, לאחר מכן בוחר סוג אישור (זמני/קבוע) ומגדיר TTL אם נדרש
   if (( ${#SELECTED_RULES[@]} == 0 )); then
     operation_error "there are no blocked USBGuard devices to approve"
   fi
@@ -227,6 +242,8 @@ select_devices_interactively() {
 }
 
 check_selected_ids() {
+  # בודקת מזהים שנבחרו - מאמתת שכל מזהה הוא מספר שלם,
+  # מזהים כפולים אינם מותרים, ומזהה תוכנן קיים ברשימת המכשירים החסומים
   local device_id
   for device_id in "${SELECTED_DEVICES[@]}"; do
     if [[ ! "$device_id" =~ ^[0-9]+$ ]]; then
@@ -243,6 +260,8 @@ check_selected_ids() {
 }
 
 preflight_selected_devices() {
+  # בדיקת תנאי מקדימה למכשירים שנבחרו - בודקת חוקים פעילים,
+  # סתירות חוקים, ניגוד עדיפויות, וכללי קבועים שמאלצים מצב של Recovery
   local device_id rule line rule_id active_rule persistent_status
   SELECTED_BLOCK_REASONS=()
 
@@ -294,6 +313,7 @@ preflight_selected_devices() {
 }
 
 approval_block_message() {
+  # מציגה הודעת אזהרה בהתאם לסוג החסימה
   case "$1" in
     duplicate_rule) printf 'matching rule already exists in active policy' ;;
     precedence_conflict) printf 'an earlier block/reject rule takes precedence' ;;
@@ -304,6 +324,7 @@ approval_block_message() {
 }
 
 approval_summary() {
+  # מציגה סיכום אישור הכולל את סוג האישור, TTL (אם זמני) ורשימת המכשירים עם אזהרות אם יש
   local device_id
   local summary="Review the approval plan. Devices with policy warnings will be skipped."
   summary+=$'\n\n'"Type: $APPROVAL_TYPE"
@@ -320,6 +341,8 @@ approval_summary() {
 }
 
 result_add_failure() {
+  # תוסף תוצאה כושלת לרשימת פריטים - מקבלת מזהה התקן, קוד יציאה,
+  # פרטים ו-code פרט. תומכת בקודי פירוט שונים כמו inconsistent_state, validation_failed וכו'
   local device_id="$1"
   local exit_code="$2"
   local detail="$3"
@@ -357,6 +380,8 @@ result_add_failure() {
 }
 
 release_device_lock() {
+  # משחררת את הנעילה הגלובלית - מגדירה Trap ל-exit ומפעילה lock_release
+  # אם שחרור נעלם עבר בהצלחה, מחזיר 0; אחרת מדפיס שגיאה ומאתחל BATCH_UNCERTAIN
   trap 'lock_release' EXIT
   if lock_release; then
     return 0
@@ -367,11 +392,13 @@ release_device_lock() {
 }
 
 process_device() {
+  # מטפלת בהתקן ספציפי - רוכשת נעילה, מאמתת שתקין המצב,
+  # בודקת שהמכשיר עדיין קיים ושינוי המדיניות, ומבצעת אישוי זמני או קבוע
   trap 'lock_release' EXIT
   local device_id="$1"
   local original_rule="${SELECTED_RULES[$device_id]}"
   local current_rule=""
-  local record current_id current_text
+  local current_id current_text
   local rc managed_id="" output_file=""
 
   if ! lock_acquire 5; then
@@ -473,6 +500,8 @@ process_device() {
 }
 
 confirm_approval() {
+  # לאישור סופי - אם dry-run, מדלג ישר. דורשת טרמינל לכניסה אינטראקטיבית.
+  # מציגה סיכום באמצעות whiptail או מבקשת הזנת "APPROVE"
   if (( DRY_RUN )); then
     return 0
   fi
@@ -494,6 +523,8 @@ confirm_approval() {
 }
 
 process_selected_devices() {
+  # מטפלת במכשירים שנבחרו - עוברת על כל מזהה, בודקת אם יש סיבה blocking,
+  # ומטפלת במכשיר. אם התקבלה אי-ודאות, עוצרת את שאר המכשירים
   local index device_id
   for ((index = 0; index < ${#SELECTED_DEVICES[@]}; index++)); do
     device_id="${SELECTED_DEVICES[$index]}"
@@ -518,6 +549,8 @@ process_selected_devices() {
 }
 
 finalize_batch_result() {
+  # מסכמת תוצאות batch - בודקת מצבים שונים: אי-ודאות, כשלון audit, כשלון כללי,
+  # או הצלחה מלאה, ומגדירה את הודעת התוצאה המתאימה
   if (( BATCH_UNCERTAIN )); then
     result_recovery_required "one or more device outcomes or the global lock state require recovery"
   elif (( BATCH_AUDIT_FAILED )); then
@@ -538,6 +571,9 @@ finalize_batch_result() {
 }
 
 main() {
+  # פותח את תהליך האישור המרכזי - מתחילה בהגדרת ארגומנטים, אתחול תוצאות,
+  # איסוף מכשירים חסומים, בחירה (אינטראקטיבית או מפורשת), בדיקת תנאים מקדמיים,
+  # אישור סופי וביצוע האישוי במכשירים נבחרים
   local selected_rc device_id
   local BATCH_FAILED=0 BATCH_UNCERTAIN=0 BATCH_AUDIT_FAILED=0
   local BATCH_SUCCEEDED=0 BATCH_FAILURE_RC=0
@@ -550,6 +586,7 @@ main() {
     validation_error "--ttl must be between 60 and 2592000 seconds"
   fi
 
+  # איסוף רשימת המכשירים החסומים ובחירת המכשירים לאישור
   collect_blocked_devices
   if (( ${#REQUESTED_DEVICES[@]} > 0 )); then
     SELECTED_DEVICES=("${REQUESTED_DEVICES[@]}")

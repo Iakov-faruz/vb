@@ -1,5 +1,24 @@
 #!/usr/bin/env bash
 # Shared process lock for state and policy mutations.
+# 
+# --- הסבר בעברית ---
+# ספריית נעילה משותפת (process lock) לכל פעולות שינוי מצב/מדיניות.
+# מטרת הספרייה: להבטיח שרק תהליך אחד מבצע מוטציה במקביל (exclusivity),
+# ולמנוע race conditions על קבצי state/policy. הנעילה משתמשת ב-flock(2)
+# על קובץ נעילה ייעודי (/run/lock/...), ומוודאת בעלות/הרשאות קובץ.
+# כל פונקציה מחזירה 0 בהצלחה, nonzero בכשל; הודעות שגיאה ל-stderr.
+#
+# פונקציות עיקריות:
+#   lock_acquire <timeout>   - רכישת נעילה אקסקלוסיבית עם timeout
+#   lock_release             - שחרור הנעילה (נקרא גם ב-EXIT trap)
+#   lock_validate_file      - בדיקת קובץ הנעילה (regular, לא symlink, בעלות/mode)
+#   lock_install_exit_trap  - התקנת trap לשחרור אוטומטי ביציאה
+#
+# משתנים גלובליים: LOCK_FILE, LOCK_FD, LOCK_HELD, LOCK_OWNER_PID.
+#
+# אזהרה: callers חייבים halten the lock for the entire mutation operation.
+"
+# Shared process lock for state and policy mutations.
 
 if [[ "$(declare -p USBAM_LOCK_LIBRARY_LOADED 2>/dev/null || true)" != "declare -r USBAM_LOCK_LIBRARY_LOADED="* ]]; then
   readonly USBAM_LOCK_DEFAULT_PATH="/run/lock/usbguard-approval-manager.lock"
@@ -14,6 +33,8 @@ lock_error() {
   printf 'lock: ERROR: %s\n' "$1" >&2
 }
 
+# --- נעילה: בדיקת קובץ הנעילה ---
+# מוודא שהקובץ קיים, רגיל (לא symlink), עם בעלות/mode בטוחים.
 lock_validate_file() {
   local expected actual
 
@@ -41,6 +62,8 @@ lock_validate_file() {
   fi
 }
 
+# --- נעילה: התקנת EXIT trap ---
+# מבטיחה שחרור נעילה אוטומטי ביציאה; דוחה אם trap קיים.
 lock_install_exit_trap() {
   local current_trap
   current_trap="$(trap -p EXIT)"
@@ -59,6 +82,8 @@ lock_install_exit_trap() {
   return 1
 }
 
+# --- נעילה: רכישת נעילה ---
+# timeout חובה (שניות). בודק שלא כבר מוחזק, מאמת קובץ, פותח fd, flock.
 lock_acquire() {
   local timeout="${1:-}"
 
@@ -96,6 +121,8 @@ lock_acquire() {
   fi
 }
 
+# --- נעילה: שחרור ---
+# רק התהליך שרכש יכול לשחרר. סוגר fd ומאפס state.
 lock_release() {
   if (( LOCK_HELD == 0 )); then
     return 0

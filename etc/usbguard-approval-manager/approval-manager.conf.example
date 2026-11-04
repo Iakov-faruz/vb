@@ -1,0 +1,30 @@
+# USBGuard Approval Manager - Configuration Example
+# SRS v4.5 - All keys validated by config-reader.sh (no source/eval)
+
+# TTL for temporary rules (seconds, 60-86400)
+TEMP_TTL_SECONDS=3600
+
+# Minimum reasonable epoch (2020-01-01)
+MIN_REASONABLE_EPOCH=1577836800
+
+# Maximum allowed clock jump (seconds)
+MAX_CLOCK_JUMP_SECONDS=3600
+
+# Number of backups to keep
+BACKUP_KEEP=5
+
+# IPC timeout for usbguard queries (seconds, 1-60)
+IPC_TIMEOUT_SECONDS=5
+
+# Log level: DEBUG, INFO, WARNING, ERROR
+LOG_LEVEL=INFO
+
+# State directory
+STATE_DIR=/var/lib/usbguard-approval-manager
+
+# Backup directory
+BACKUP_DIR=/var/backups/usbguard-approval-manager
+
+# Lock files (split-locking)
+STATE_LOCK_FILE=/run/lock/usbguard-approval-manager-state.lock
+POLICY_LOCK_FILE=/run/lock/usbguard-approval-manager-policy.lock
