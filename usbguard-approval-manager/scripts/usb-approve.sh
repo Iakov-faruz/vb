@@ -357,6 +357,7 @@ result_add_failure() {
 }
 
 release_device_lock() {
+  trap 'lock_release' EXIT
   if lock_release; then
     return 0
   fi
@@ -366,6 +367,7 @@ release_device_lock() {
 }
 
 process_device() {
+  trap 'lock_release' EXIT
   local device_id="$1"
   local original_rule="${SELECTED_RULES[$device_id]}"
   local current_rule=""
