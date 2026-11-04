@@ -9,6 +9,13 @@ set -o errexit -o nounset -o pipefail
 # Sourcing a library twice must not reset results or fail on readonly constants.
 source "$PROJECT_ROOT/scripts/lib/result.sh"
 
+# --- הסבר בעברית ---
+# בדיקת יחידה ל-model תוצאות/שגיאות (result model).
+# בודקת אתחול, קודי יציאה, מצבי תוצאה והדפסת JSON.
+# מודל תוצאות משותף (SRS §21, SEC-16) עם קבועי יציאה מוגדרים מראש
+# ופונקציות ניהול state גלובלי.
+# בודקת שכפילת אתחול, תרגום מצבים ופלט JSON תקין.
+
 if env RESULT_MODEL_LOADED=1 bash -c \
   'source "$1"; [[ "$EXIT_AUDIT" == "14" ]]' _ \
   "$PROJECT_ROOT/scripts/lib/result.sh"; then

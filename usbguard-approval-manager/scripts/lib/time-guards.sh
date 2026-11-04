@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Calendar-time checks using verified system NTP synchronization evidence.
+# בדיקות זמן לוח שנה באמצעות ראיות נמוטרון NTP מאומתות.
 #
 # --- הסבר בעברית ---
 # בדיקות זמן לוחיות באמצעות ראיות אימות סנכרון NTP של מערכת ההפעלה.
@@ -24,6 +25,9 @@ clock_error() {
 }
 
 clock_sync_evidence() {
+  # איסוף ראיות סנכרון שעון - בודקת provider NTP (ntpsec/ntp),
+  # status של timedatectl, ועמיתי NTP תקינים דרך ntpq.
+  # מחזירה CLOCK_SYNC_PROVIDER, CLOCK_SYNC_STATUS, ו-CLOCK_TRUST_DETAIL_CODE
   CLOCK_SYNC_PROVIDER=""
   CLOCK_SYNC_STATUS=""
   CLOCK_TRUST_DETAIL_CODE="clock_sync_evidence_unavailable"

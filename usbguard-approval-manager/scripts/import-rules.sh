@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # Validate, stage, diff, and explicitly approve a schema-version-1 rules import.
-
-set -uo pipefail
-umask 077
+#
+# --- הסבר בעברית ---
+# אימות, שלב, דיפי ואישור מפורש של ייבוא חוקים בגרסת סכימה 1.
+# תוכנת לאמת, לשלב, להציג הבדלים (diff) ולאשר מפורשות ייבוא של חוקי USBGuard.
+# פועלת לפי גרסת סכימה 1 ומבטיחה תאימות עם מבנה חוקים SRS v4.5.
+# תומכת בהצגת הבדלים בין חוקים קיימים לחוקים חדשים לאישור.
+#
+# תלויה: lib/validators.sh, lib/lifecycle.sh, lib/result.sh, python3
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$SCRIPT_DIR/lib"

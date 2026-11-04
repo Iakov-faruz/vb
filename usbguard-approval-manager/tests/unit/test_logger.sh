@@ -13,6 +13,13 @@ cat > "$TEST_DIR/bin/logger" <<'LOGGER'
 printf '%s\n' "$*" >> "$LOGGER_CAPTURE"
 LOGGER
 chmod 700 "$TEST_DIR/bin/logger"
+
+# --- הסבר בעברית ---
+# בדיקת יחידה לספריית לוגים (logger).
+# בודקת הפרדה בין לוג תפעולי syslog לזרם Audit JSONL מוגן.
+# בודקת כתיבת הודעות info/error דרך פקודת logger.
+# בודקת כתיבת Audit JSONL דרך audit_write.py עם הרשאות מתאימות.
+# מאמתת שכתיבת Audit שנכשלה מדווחת כיאות ושומרת תוצאת מדיניות.
 export LOGGER_CAPTURE="$TEST_DIR/operational.log"
 export PATH="$TEST_DIR/bin:$PATH"
 source "$LOGGER_LIBRARY"

@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
-# USBGuard Approval Manager - USBGuard Policy Adapte
+# USBGuard Approval Manager - USBGuard Policy Adapter
 # Phase 2 Full Implementation - SRS v4.5 Approved 28.10.2026
 # This adapter is the ONLY layer that talks to USBGuard.
 # Read-only operations are safe everywhere. Write operations require G-01 verification
 # and must only run in an isolated lab VM with USB passthrough and recovery route.
+# USBGuard Approval Manager - USBGuard Policy Adapter
+# שלב 2 מלא יישום - SRS v4.5 מאושר 28.10.2026
+# שכבה זו היא היחידה שמדברת עם USBGuard.
+# פעולות קריאה הן בטוחות בכל מקוד. פעולות כתיבה דורשות אימות G-01
+# וצריכות לרוץ רק ב-VM מעבדה מבודד עם USB passthrough ונתיב התאוששות.
 
 if [[ -z "${USBAM_USB_POLICY_LOADED+x}" ]]; then
   declare -g USBAM_POLICY_STDOUT=""
@@ -25,10 +30,14 @@ fi
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/lock.sh"
 
 usbguard_policy_error() {
+  # מדפיסה הודעת שגיאה עם תגית usbguard-policy ל-stderr
   printf 'usbguard-policy: ERROR: %s\n' "$1" >&2
 }
 
 usbguard_policy_require_lock() {
+  # וודאת ש-lock Held for the complete operation
+  # בודקת אם LOCK_HELD == 0 או ש-BASHPID אינו הבעלים הנוכחי,
+  # ומאתחלת USBAM_POLICY_ERROR_CODE ל-lock_not_held
   if (( LOCK_HELD == 0 )) || [[ "$LOCK_OWNER_PID" != "$BASHPID" ]]; then
     usbguard_policy_error "policy mutations require the global lock for the complete operation"
     USBAM_POLICY_ERROR_CODE="lock_not_held"
@@ -49,6 +58,10 @@ usbguard_policy_timeout() {
 
 # Internal runner - shared logic for read-only and write
 _usbguard_run() {
+  # ריצה פנימית משותפת - logic לקריאה וכתיבה ל-USBGuard
+  # מאמתת timeout, בודקת נוכחות של timeout ו usbguard CLIs,
+  # יוצרת temp_dir לתפוקת פקודה, מריצה את הפקודה עם timeout,
+  # אוגרת stdout/stderr, ומחזירה codestatus
   local timeout_seconds temp_dir status
   USBAM_POLICY_STDOUT=""
   USBAM_POLICY_STDERR=""
@@ -106,6 +119,9 @@ _usbguard_run() {
 }
 
 usbguard_policy_run_readonly() {
+  # ריצת פקודת USBGuard לקריאה בלבד
+  # תומכת בפקודות: --version, list-rules, list-devices --blocked
+  # מזהה פקודות לא נתמכות ומחזירה שגיאה
   if (( $# == 0 )); then
     usbguard_policy_error "a read-only USBGuard subcommand is required"
     USBAM_POLICY_ERROR_CODE="invalid_arguments"
@@ -131,6 +147,9 @@ usbguard_policy_run_readonly() {
 }
 
 usbguard_policy_run_write() {
+  # ריצת פקודת USBGuard לכתיבה
+  # תומכת בפקודות: allow-device, block-device, append-rule, remove-rule
+  # דורשת אימות G-01 ו-check ש-lock held לפני הריצה
   if (( $# == 0 )); then
     usbguard_policy_error "a USBGuard write subcommand is required"
     USBAM_POLICY_ERROR_CODE="invalid_arguments"
@@ -138,7 +157,7 @@ usbguard_policy_run_write() {
   fi
   case "$1" in
     allow-device|block-device|append-rule|remove-rule)
-      ;;
+      ;
     *)
       usbguard_policy_error "unsupported USBGuard write operation: $1"
       USBAM_POLICY_ERROR_CODE="invalid_command"

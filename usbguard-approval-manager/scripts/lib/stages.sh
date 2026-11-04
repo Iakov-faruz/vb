@@ -41,12 +41,14 @@ if [[ -n "${USBAM_LOCK_FILE:-}" ]]; then
   LOCK_FILE="$USBAM_LOCK_FILE"
 fi
 
+# --- stages: הדפסת שגיאה ---
 stages_error() {
   STAGES_ERROR="$1"
   STAGES_ERROR_CODE="${2:-stages_failed}"
   printf 'stages: ERROR: %s\n' "$1" >&2
 }
 
+# --- stages: הרצת לוגיקה תחת lock ---
 stages_run_locked() {
   # מריצה פעולה תחת נעילה - רוכשת lock אם נדרש, מפעילה את הפעולה המבוקשת,
   # ומשחררת את הלock בתום הפעולה. מגנה מפני מצבים של lock_not_owned.
@@ -78,6 +80,7 @@ stages_run_locked() {
   return "$rc"
 }
 
+# --- stages: הבטחת תיקיית state ---
 stages_ensure_state_dir() {
   # וודאת תיקיית מצב - דורשת lock Held, אינה מאפשרת סימבול-לינק,
   # יוצרת תיקייה אם אינה קיימת ומגדירה הרשאות 700
@@ -102,6 +105,7 @@ stages_ensure_state_dir() {
   return 0
 }
 
+# --- stages: אתחול TTL file אם חסר ---
 _stages_init_ttl_file_if_missing() {
   # אתחול ttl.json אם אינו קיים - וודאת תיקיית מצב, יצירת JSON ראשוני אם נדרש,
   # ושימוש בכתיבה אטומית דרך atomic-write.py
@@ -121,6 +125,7 @@ _stages_init_ttl_file_if_missing() {
 }
 
 # Create a pending record JSON object (not yet written to file)
+# --- stages: יצירת record ממתין ---
 stages_create_pending_record() {
   # יוצרת אובייקט JSON של רשומת pending - אינה כתובה לקובץ עד לשלב מאוחר יותר
   local rule="$1"
@@ -192,6 +197,7 @@ stages_create_pending_record() {
 }
 
 # Atomically add a record to ttl.json
+# --- stages: הוספת record ---
 _stages_add_record() {
   # מוספת רשומה חדשה ל-ttl.json בכתיבה אטומית
   # מאמתת תוכן קיים, מוסיפה את הרשומה החדשה via jq, ומבצעת write אטומי
@@ -238,6 +244,7 @@ _stages_add_record() {
 }
 
 # Update record status with transition validation
+# --- stages: עדכון סטטוס ---
 _stages_update_status() {
   # מעדכנת את סטטוס הרשומה עם אימות מעבר סטטוס
   # מאמתת מעבר חוקי (pending->active, expired->...), וכותבת את השינוי אטומי
@@ -308,6 +315,7 @@ _stages_update_status() {
 # עסקת אישוי זמני מלא (ליבת stages.sh)
 # שימוש: stages_approve_temporary <rule> <ttl_seconds> [correlation_id]
 # מחזירה managed_id בהצלחה, מעדכנת ttl.json למצב active
+# --- stages: אישור זמני ---
 _stages_approve_temporary() {
   # Full temporary approval transaction (stages.sh core)
   # Usage: stages_approve_temporary <rule> <ttl_seconds> [correlation_id]
@@ -477,6 +485,7 @@ _stages_approve_temporary() {
 }
 
 # Permanent approval transaction
+# --- stages: אישור קבוע ---
 _stages_approve_permanent() {
   # עסקת אישוי קבוע - בודקת תנאים מקדימים, מוסיפה חוק קבוע,
   # ואם צוין התקן - מאשרת אותו. תומכת בסיווג שגיאות שונות.
@@ -537,6 +546,7 @@ _stages_approve_permanent() {
   return 0
 }
 
+# --- stages: ייבוא זמני ---
 _stages_import_temporary() {
   local rule="$1"
   local expires_at="$2"
@@ -639,26 +649,32 @@ _stages_import_temporary() {
   printf '%s\n' "$managed_id"
 }
 
+# --- stages: wrapper אתחול ---
 stages_init_ttl_file_if_missing() {
   stages_run_locked _stages_init_ttl_file_if_missing "$@"
 }
 
+# --- stages: wrapper הוספה ---
 stages_add_record() {
   stages_run_locked _stages_add_record "$@"
 }
 
+# --- stages: wrapper עדכון ---
 stages_update_status() {
   stages_run_locked _stages_update_status "$@"
 }
 
+# --- stages: wrapper אישור זמני ---
 stages_approve_temporary() {
   stages_run_locked _stages_approve_temporary "$@"
 }
 
+# --- stages: wrapper אישור קבוע ---
 stages_approve_permanent() {
   stages_run_locked _stages_approve_permanent "$@"
 }
 
+# --- stages: wrapper ייבוא זמני ---
 stages_import_temporary() {
   stages_run_locked _stages_import_temporary "$@"
 }

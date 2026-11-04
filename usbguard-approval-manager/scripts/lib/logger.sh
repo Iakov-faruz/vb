@@ -27,6 +27,8 @@ fi
 # --- לוג: כתיבה תפעולית ל-syslog ---
 # בודק control chars, זמינות logger, כותב עם tag/priority.
 log_operational() {
+  # כתיבת לוג תפעולי ל-syslog
+  # בודקת ש-message אינה מכילה תווים שליטה, וודאית ש-utils של logger זמינים
   local LC_ALL=C
   local priority="$1"
   local message="$2"
@@ -58,6 +60,10 @@ log_error() {
 # --- לוג: Audit JSONL via python helper ---
 # 4 args: action, policy_result, correlation_id, optional details.
 log_audit() {
+  # כתיבת Einnot Audit JSONL דרך helper של python
+  # מקבלת 3-4 ארגומנטים: action, policy_result, correlation_id, ופרטים אופציונליים
+  # מדפיסה שגיאה אם מספר ארגומנטים שגוי, אם audit_writer חסר/לא קריא,
+  # או אם הכתיבה כשלה - caller must preserve policy outcome
   if (( $# < 3 || $# > 4 )); then
     printf 'logger: ERROR: log_audit requires action, policy result, correlation ID, and optional details\n' >&2
     return 2
