@@ -4,8 +4,13 @@
 # SRS v4.5: Creates backup of RuleFile, RuleFolder, ttl.json, clock_state.json
 # to /var/backups/usbguard-approval-manager/ with timestamp,
 # keeps BACKUP_KEEP versions, uses atomic-write, locking, audit, result.sh JSON
-
-set -euo pipefail
+#
+# --- הסבר בעברית ---
+# גיבוי שלב 5 עם מודעות יומן, נעילת פיצול, כתיבה אטומית ו-logs audit.
+# יוצר גיבוי של RuleFile, RuleFolder, ttl.json, clock_state.json
+# לתיקיית /var/backups/usbguard-approval-manager/ עם תג timestamp.
+# שומר BACKUP_KEEP גרסאות, משתמש בכתיבה אטומית, נעילות, audit ו-result.sh JSON.
+# תוכנת כך שגיבוי לא ישנה את מדיניות ה-USBGuard הקיימת אלא רק יעתיק נתונים.
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$SCRIPT_DIR/lib"

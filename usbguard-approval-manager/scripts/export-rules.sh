@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 # Export only validated, non-system permanent allow rules and active TTL records.
-
-set -uo pipefail
+#
+# --- הסבר בעברית ---
+# ייצוא רק כללי Allow מאומן, לא-מערכתיים, ורשומות TTL פעילות.
+# מייצאת אך ורק כללי allow שנבדקו ואומתו, שאינם כללים מערכתיים (00-system.rules),
+# ורשומות TTL הפעילות במערכת.
+# תוכנת לפי SRS v4.5 ומבטיחה תקינות של כללי היציאה.
+#
+# תלויה: lib/lifecycle.sh, lib/validators.sh, jq
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$SCRIPT_DIR/lib"

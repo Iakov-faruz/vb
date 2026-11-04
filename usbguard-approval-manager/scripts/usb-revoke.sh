@@ -2,8 +2,15 @@
 # usb-revoke.sh - זריחת גלוי מפורש (SRS v4.5 Section 14.2, FR-27, T-27)
 # כלי נפרד למנהל, אינו חלק מה-Reaper, דורשת אישור אינטראקטיבי
 # פועלת רק עם רשומת TTL פג תוקף, מזהה מכשיר טרי, נעילה, re-fetch, אימות G-01
-
-set -euo pipefail
+#
+# --- הסבר בעברית ---
+# usb-revoke.sh - כלי גלוי מפורש לביטול אישור מכשירי USB (SRS v4.5 Section 14.2, FR-27, T-27).
+# כלי נפרד למנהל, אינו חלק מה-Reaper, דורשת אישור אינטראקטיבי.
+# פועלת רק עם רשומת TTL פג תוקף, מזהה מכשיר טרי, נעילה, re-fetch, אימות G-01.
+# משמש לביטול אישור של התקני USB ש-TTL שלהם פקע, עם אימות מול יומן השחזור.
+# דורשת גישה לנעילות state/policy וממשק תקין של G-01 gate.
+#
+# תלויות: lib/lock.sh, lib/result.sh, lib/journal.sh
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$SCRIPT_DIR/lib"

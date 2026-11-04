@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 # Root-only, no-argument prompt used by the restricted sudoers entry.
-
-set -euo pipefail
+#
+# --- הסבר בעברית ---
+# בקשה Root-only ללא ארגומנטים, המשמשת את כניסת ה-sudoers המוגבלת.
+# פותח על ידי root בלבד, ללא קבלת ארגומנטים מהמשתמש.
+# משמשת על ידי Entry בסודרים לצורך ביטול אישור אינטראקטיבי של התקני USB.
+# מחזירה exit code 7 כשל בכניסת ארגומנטים לא חוקיים.
+#
+# תלויה בהגדרות sudoers: %usbadmins ALL=(root) NOPASSWD: /usr/libexec/usbguard-approval-manager/usb-revoke-interactive.sh ""
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 

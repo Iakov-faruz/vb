@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 # תיקון בריאותי לקריאה בלבד - בדיקת התקנה וריצה של USBGuard Approval Manager
 # בודק תקינות של תיקיות, קבצים, הגדרות, יחידות systemd, מצב TTL וגיבויים
-
-set -uo pipefail
+#
+# --- הסבר בעברית ---
+# בדיקת בריאותית לקריאה בלבד של התקנת USBGuard Approval Manager.
+# בודק תקינות של תיקיות, קבצים, הגדרות, יחידות systemd, מצב TTL וגיבויים.
+# מאמתת את שלמות המערכת לפני הפעלת פעולות מדיניות.
+# מחזירה exit code 0 אם כל הבדיקות עברו, non-zero אם נמצאו בעיות.
+#
+# תלויה: scripts/lib/config-reader.sh, scripts/lib/validators.sh
 
 PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$PROJECT_ROOT/scripts/lib/config-reader.sh"

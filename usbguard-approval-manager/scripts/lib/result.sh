@@ -210,16 +210,19 @@ result_set() {
 
 # --- תוצאה: getter state ---
 result_get_state() {
+  # מחזירה את מצב התוצאה הנוכחי (RESULT_STATE)
   printf '%s\n' "$RESULT_STATE"
 }
 
 # --- תוצאה: getter exit code ---
 result_get_exit_code() {
+  # מחזירה את קוד היציאה הנוכחי (RESULT_EXIT_CODE)
   printf '%s\n' "$RESULT_EXIT_CODE"
 }
 
 # --- תוצאה: getter detail ---
 result_get_detail() {
+  # מחזירה את פרטי התוצאה הנוכחיים (RESULT_DETAIL)
   printf '%s\n' "$RESULT_DETAIL"
 }
 

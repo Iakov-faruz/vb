@@ -80,6 +80,9 @@ lock_install_exit_trap() {
 # --- נעילה: רכישת נעילה ---
 # timeout חובה (שניות). בודק שלא כבר מוחזק, מאמת קובץ, פותח fd, flock.
 lock_acquire() {
+  # רכישת נעילה אקסקלוסיבית עם timeout
+  # מאמתת ש-Lock אינו מוחזק כבר, מאמתת את קובץ הנעילה,
+  # פותח את הקובץ ומפעילה flock עם timeout שנקבע.
   local timeout="${1:-}"
 
   if (( $# != 1 )) ||
@@ -119,6 +122,8 @@ lock_acquire() {
 # --- נעילה: שחרור ---
 # רק התהליך שרכש יכול לשחרר. סוגר fd ומאפס state.
 lock_release() {
+  # שחרור הנעילה - מאמתת ש-Lock Held, ש-Owner PID תואם,
+  # ומאתירה את תיאור lock descriptor. מחזירה 0 בהצלחה.
   if (( LOCK_HELD == 0 )); then
     return 0
   fi

@@ -2,8 +2,13 @@
 # cleanup-expired.sh - TTL Reaper (SRS v4.5 Section 14)
 # Type=oneshot systemd service, runs every 5 minutes
 # NEVER runs block-device automatically. Reports EXPIRED_RULE_REMOVED_DEVICE_STILL_ALLOWED.
-
-set -euo pipefail
+#
+# --- הסבר בעברית ---
+# ניקוי חוקי TTL פגי תוקף (SRS v4.5 Section 14).
+# שירות Type=oneshot של systemd, רץ כל 5 דקות.
+# לעולם אינו מפעיל התקני block-device אוטומטית. מדווח על חוקים שפגו תוקף שהוסרו אך עדיין מותרים.
+# אחראית על ניקיון חוקי TTL שפגו תוקפם, הסרת חוקים פגי תוקף, ודיווח על המצב.
+# פועלת בליווי יומן ומבטיחה שלא יוסרו חוקים פעילים.
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$SCRIPT_DIR/lib"

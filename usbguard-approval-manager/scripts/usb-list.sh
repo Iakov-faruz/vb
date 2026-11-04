@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 # usb-list.sh - List managed rules
 # מציגה רשימת תקני ניהול (managed rules) מקובץ ttl.json
-set -euo pipefail
+#
+# --- הסבר בעברית ---
+# מציגה רשימת תקני ניהול (managed rules) הנקראים מקובץ TTL (ttl.json).
+# תוכנת להציג את כללי ה-TTL הפעילים, פגי תוקף או את כל הרשומות.
+# משמשת להצגת המצב הנוכחי של חוקי ה-USBGuard המאומן.
+#
+# תלויה: STATE_DIR, lib/validators.sh, lib/tui.sh
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$SCRIPT_DIR/lib"
 source "$LIB_DIR/validators.sh" 2>/dev/null || true
