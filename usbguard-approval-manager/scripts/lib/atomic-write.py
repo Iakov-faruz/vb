@@ -13,7 +13,7 @@ from pathlib import Path
 
 FILE_MODE = 0o600
 TEMP_ATTEMPTS = 10
-MAX_JSON_SIZE = 1 * 1024 * 1024  # 1 MiB
+MAX_JSON_SIZE = 1 * 1024 * 1024  # 1 MiB maximum document size
 
 
 class AtomicWriteError(Exception):
@@ -25,10 +25,12 @@ class AtomicWriteError(Exception):
 
 
 def _reject_json_constant(value: str) -> None:
+    """Reject non-standard JSON constants (e.g., `True`, `False`, `None`)."""
     raise ValueError(f"invalid JSON constant: {value}")
 
 
 def write_all(fd: int, payload: bytes) -> None:
+    """Write all payload bytes to file descriptor, handling partial writes."""
     view = memoryview(payload)
     while view:
         written = os.write(fd, view)
@@ -38,6 +40,7 @@ def write_all(fd: int, payload: bytes) -> None:
 
 
 def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Reject JSON documents with duplicate keys, keeping first occurrence."""
     result: dict[str, object] = {}
     for key, value in pairs:
         if key in result:

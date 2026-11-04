@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Read-only installation and runtime health validation.
+# תיקון בריאותי לקריאה בלבד - בדיקת התקנה וריצה של USBGuard Approval Manager
+# בודק תקינות של תיקיות, קבצים, הגדרות, יחידות systemd, מצב TTL וגיבויים
 
 set -uo pipefail
 
@@ -27,6 +28,7 @@ CONFIG_CONF_REL="/etc/usbguard-approval-manager/config/usbguard-approval-manager
 usage() {
   printf 'Usage: %s [--static]\n' "$0"
   printf '  --static  Validate installed files only; skip runtime, IPC and backup checks.\n'
+  # הסבר: מצב נייח - בודק רק קבצים מותקנים, מדלג על בדיקות runtime, IPC וגיבויים
 }
 
 while (( $# )); do
@@ -56,8 +58,10 @@ if [[ "$ROOT" != "/" ]]; then
   ROOT="$(cd -- "$ROOT" && pwd -P)" || exit 1
   [[ "$ROOT" != "/" ]] || { printf 'FAIL: USBAM_ROOT cannot resolve to /\n' >&2; exit 1; }
 fi
+# בדיקת תיקיית שורש - אם נקבעה משתנה ROOT, וודא שהיא תיקייה קיימת, לא סימבול-לינק וכלולה בנתיב מלא
 
 path_for() {
+  # פותח נתיב קובץ - אם ROOT הוא תיקייה ראשית, הדפיס נתיב פשוט; אחרת הוסף את ה-ROOT כנתיב קדם
   if [[ "$ROOT" == "/" ]]; then
     printf '%s\n' "$1"
   else
@@ -68,19 +72,23 @@ path_for() {
 report_pass() {
   printf 'PASS: %s\n' "$1"
   PASS_COUNT=$((PASS_COUNT + 1))
+  # סמן בדיקה שעברה בהצלחה והגדיל את מונה המעברים
 }
 
 report_fail() {
   printf 'FAIL: %s\n' "$1"
   FAIL_COUNT=$((FAIL_COUNT + 1))
+  # סמן בדיקה שנכשלה והגדיל את מונה הכישלונות
 }
 
 report_skip() {
   printf 'UNVERIFIED: %s\n' "$1"
   SKIP_COUNT=$((SKIP_COUNT + 1))
+  # סמן בדיקה שמדלגים עליה (לא נבדקה מטעמים שונים)
 }
 
 expected_ids() {
+  # מחזיר זיהוי קבוצה צפוי - אם ROOT אינו "/", החזיר את ה-UID וה-GID הנוכחיים
   local group="$1" group_id
   if [[ "$ROOT" != "/" ]]; then
     printf '%s:%s\n' "$(id -u)" "$(id -g)"
@@ -92,9 +100,11 @@ expected_ids() {
 }
 
 check_directory() {
+  # בודקת תיקייה - מקבלת תווית, נתיב, מצב הרשאות ומגרש
   local label="$1" path="$2" mode="$3" group="$4"
   local expected actual
   path="$(path_for "$path")"
+  # אם הנתיב הוא סימבול-לינק או לא תיקייה - סמן ככישלון
   if [[ -L "$path" || ! -d "$path" ]]; then
     report_fail "$label: missing, not a directory, or symbolic link"
     return 1
@@ -117,9 +127,11 @@ check_directory() {
 }
 
 check_file() {
+  # בודקת קובץ - מקבלת תווית, נתיב, מצב הרשאות ומגרש
   local label="$1" path="$2" mode="$3" group="$4"
   local expected actual
   path="$(path_for "$path")"
+  # אם הנתיב הוא סימבול-לינק או לא קובץ רגיל - סמן ככישלון
   if [[ -L "$path" || ! -f "$path" ]]; then
     report_fail "$label: missing, not a regular file, or symbolic link"
     return 1
@@ -142,6 +154,7 @@ check_file() {
 }
 
 check_configuration() {
+  # בודקת הגדרות - מאמתת תיקיית הגדרות, קובץ הגדרות, הרשאות ותקינות סינטקטית
   local path
   path="$(path_for "$CONFIG_PATH")"
   if check_directory "configuration directory" /etc/usbguard-approval-manager 750 root &&
