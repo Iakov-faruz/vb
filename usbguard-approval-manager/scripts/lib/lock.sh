@@ -47,6 +47,10 @@ lock_install_exit_trap() {
   case "$current_trap" in
     "trap -- 'lock_release' EXIT"|"trap -- 'lock_release;"*" EXIT") return 0 ;;
   esac
+  # Accept traps that call lock_release (e.g. test cleanup traps)
+  if [[ "$current_trap" == *"lock_release"* ]]; then
+    return 0
+  fi
   if [[ -z "$current_trap" ]]; then
     trap 'lock_release' EXIT
     return 0
