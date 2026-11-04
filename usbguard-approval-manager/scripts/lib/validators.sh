@@ -167,8 +167,6 @@ validate_ttl_json() {
       validators_error "record $i rule is empty" "invalid_rule"
       return 1
     fi
-    if printf "%s" "$rule" | # SUPER-FINAL v4.5: Enhanced control character cleaning and validation
-    # Remove all control characters (0x00-0x1F except 0x09 tab, 0x0A newline, 0x0D carriage return)
     local rule_cleaned
     rule_cleaned="$(printf '%s' "$rule" | sed 's/[[:cntrl:]]//g')"
     
