@@ -14,7 +14,7 @@ usage() {
 Usage: run_integration_tests.sh [--safe | --live-g01]
 
 --safe (default) runs shell syntax checks, unit tests and integration tests
-  T-01..T-07. It never changes USBGuard policy or USB device state.
+  T-01..T-28. It never changes USBGuard policy or USB device state.
 --live-g01 delegates to the existing destructive G-01 harness and therefore
   requires its explicit disposable-VM, USB-ID, write and confirmation guards.
 
@@ -81,12 +81,12 @@ done
 if [[ $unit_fail -eq 0 ]]; then echo "PASS: all unit tests"; else echo "FAIL: unit test failures"; FAIL=1; fi
 
 # ------------------------------------------------------------------
-# 3. Integration tests T-01..T-07
+# 3. Integration tests T-01..T-28
 # ------------------------------------------------------------------
-echo -e '\n--- 3. Integration tests T-01..T-07 ---'
+echo -e '\n--- 3. Integration tests T-01..T-28 ---'
 integration_fail=0
-for t in 01 02 03 04 05 06 07; do
-  test_file="$PROJECT_ROOT/tests/integration/test_T${t}_*.sh"
+for t in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28; do
+  test_file="$PROJECT_ROOT/tests/integration/test_T${t}.sh"
   # expand glob
   shopt -s nullglob
   matches=( $test_file )
@@ -100,7 +100,7 @@ for t in 01 02 03 04 05 06 07; do
     echo "INTEGRATION FAIL: $(basename "$tf")"; integration_fail=1
   fi
 done
-if [[ $integration_fail -eq 0 ]]; then echo "PASS: all integration tests T-01..T-07"; else echo "FAIL: integration test failures"; FAIL=1; fi
+if [[ $integration_fail -eq 0 ]]; then echo "PASS: all integration tests T-01..T-28"; else echo "FAIL: integration test failures"; FAIL=1; fi
 
 # ------------------------------------------------------------------
 # 4. Live G-01 (optional, destructive)
@@ -117,8 +117,8 @@ fi
 # ------------------------------------------------------------------
 echo -e '\n=== Integration acceptance status ==='
 if [[ $FAIL -eq 0 ]]; then
-  echo "ALL AUTOMATED CHECKS PASSED (T-01..T-07 green)"
-  echo "NOTE: T-08..T-28 and live G-01 require an isolated target VM and retained evidence."
+  echo "ALL AUTOMATED CHECKS PASSED (T-01..T-28 green)"
+  echo "NOTE: live G-01 requires an isolated target VM and retained evidence."
   exit 0
 else
   echo "ONE OR MORE AUTOMATED CHECKS FAILED"
