@@ -11,7 +11,6 @@
 #   journal_check_and_block - חסימת mutations אם יומן קיים
 #   journal_acquire_*_lock / journal_release_*_lock - נעילות state/policy
 #   journal_last_correlation_id - correlation id אחרון
-"
 # scripts/lib/journal.sh
 # Phase 5 - restore_journal.json management with atomic-write and split-locking
 # SRS v4.5: Backup/Restore with journal, G-01 gate, Split-Locking
