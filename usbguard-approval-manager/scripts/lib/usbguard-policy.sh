@@ -157,7 +157,7 @@ usbguard_policy_run_write() {
   fi
   case "$1" in
     allow-device|block-device|append-rule|remove-rule)
-      ;
+      : ;;
     *)
       usbguard_policy_error "unsupported USBGuard write operation: $1"
       USBAM_POLICY_ERROR_CODE="invalid_command"
