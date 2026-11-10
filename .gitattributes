@@ -1,0 +1,11 @@
+* text=auto eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.conf text eol=lf
+*.conf.example text eol=lf
+*.service text eol=lf
+*.timer text eol=lf
+.gitignore text eol=lf
+Makefile text eol=lf
