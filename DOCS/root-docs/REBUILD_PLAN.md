@@ -14,12 +14,11 @@
 | פריט | ערך |
 |---|---|
 | ריפו עבודה מתוכנן | `C:\Users\5722y\Downloads\USB` (`origin`: `https://github.com/Iakov-faruz/vb.git`) |
-| `main` מקומי / `origin/main` | `0964b04` — `fix: harden installer and validation tooling before rebuild` (נדחף, fast-forward) |
+| `main` מקומי / `origin/main` | `43a8374` — `Merge branch 'docs/hebrew-comments' into main` (כולל `0964b04` fix קדם-rebuild וקומיטי התיעוד העברי/תוכנית) |
 | בסיס קודם | `56fded1` (`backup/origin-main`, `backup/main-before-rewrite`, `backup/main-original-messages-20261110`) |
-| `docs/hebrew-comments` | `802517f` — `docs(usb-approve): add detailed Hebrew inline documentation` (ללא שינוי; מכיל גם `9e71b12`) |
-| ענף תיקוני קדם-rebuild | `fix/pre-rebuild` @ `0964b04` |
+| `docs/hebrew-comments` (מקומי/מרוחק) | `e73d62b` — tip משוחזר (כולל `802517f`, `9e71b12` ומסמך התוכנית); ללא שינוי נוסף, לא ימוזג ל-`rebuild` ולא יימחק |
+| ענף תיקוני קדם-rebuild | `fix/pre-rebuild` — נמחק (מקומי+מרוחק) לאחר מיזוג; התיקונים קיימים ב-`main` |
 | גיבוי נוסף | `backup/docs-hebrew-comments-before-cleanup` @ `eea113f` |
-| worktree קיים | `C:\Users\5722y\Downloads\main-fix` → `fix/pre-rebuild` |
 
 **הערת הקשר:** `C:\Users\5722y\Desktop\vb` (`5722yz-ops/USB5722.git`, `08e1b09`) ו-`C:\Users\5722y\Desktop\USB` (לא ריפו Git) אינם בסיס לתוכנית זו, אלא אם יאושר מיזוג/העתקה מפורש.
 
@@ -34,19 +33,19 @@
 - **איסורים ללא אישור מפורש:** `push`, `merge`, `rebase`, מחיקת ענפים, יצירת קבצים שאינם במקור (חריג מאושר אם יוחלט: `.gitignore` שורש לאתחול orphan, ו-`INSTALL-FROM-SCRATCH.md` ב-C8C אם יאושר).
 - **ארטיפקט tracked:** `__pycache__/vm_client.cpython-313.pyc` הוסר ממעקב ב-`main` (`0964b04`); יוחרג גם מ-`rebuild`.
 
-## 4. בסיס קוד אחרי תיקוני קדם-rebuild (main @ `0964b04`)
+## 4. בסיס קוד אחרי תיקוני קדם-rebuild (כלול ב-`main` @ `43a8374`)
 
-שינויים שכבר בוצעו, נבדקו תחבירית (`bash -n`, `py_compile`) ונדחפו ל-`origin/main`:
+שינויים שבוצעו ב-`0964b04`, נבדקו תחבירית (`bash -n`, `py_compile`), מוזגו ל-`main` ונדחפו ל-`origin/main`:
 
 | תחום | תוצאה |
 |---|---|
-| `install-usbguard-approval-manager.sh` | הוחקש: ללא `enable --now` לטיימרים, ללא שינוי הרשאות `/run/lock`, יצירת lock/`ttl.json`/`audit.jsonl`, הרשאות libexec/log/state מותאמות, הוספת `usbguard-status.sh`, config מ-`conf/` + example ל-`config/`, חבילות מותאמות, lib files `0640` |
+| `install-usbguard-approval-manager.sh` | תוקן: ללא `enable --now` לטיימרים, ללא שינוי הרשאות `/run/lock`, יצירת lock/`ttl.json`/`audit.jsonl`, הרשאות libexec/log/state מותאמות, הוספת `usbguard-status.sh`, config מ-`conf/` + example ל-`config/`, חבילות מותאמות, lib files `0640` |
 | `usbguard-approval-manager/deploy.sh`, `Makefile` | קריאות `validate_all.sh` מוּפנות ל-`$PROJECT_ROOT/scripts/validate_all.sh`; הוסרה כפילות ב-`Makefile` |
 | `usbguard-approval-manager/scripts/lib/lifecycle.py` | נוסף `validate-backup` (parser+dispatch, `read_backup`) |
 | שורש הריפו | נוסף `.gitignore`; `__pycache__/vm_client.cpython-313.pyc` הוסר ממעקב |
-| תכנון/מסמכים | `DOCS/root-docs/REBUILD_PLAN.md` עודכן בענף `docs/hebrew-comments` (לא ב-`main`) |
+| תכנון/מסמכים | `DOCS/root-docs/REBUILD_PLAN.md` מנוקה ומוזגה ל-`main` (המקור ההיסטורי נשמר ב-`docs/hebrew-comments`) |
 
-**עדיין ידוע/לא מתוקן בכוונה:** אי-עקביות היסטורית של מיקום `validate_all.sh` מול ציפיות שונות בקוד (מתועד), `validate-backup`/זרימת בדיקות גיבוי בסביבות מסוימות ותלויות runtime (בעיה 4.4 במסמך קודם — לאמת מול קוד בסיס ה-rebuild), פערי installer מול SRS אם ייכלל ב-C8B כמות שהוא (מתועד), E2E/VM — `UNVERIFIED`.
+**עדיין ידוע/לא מתוקן בכוונה:** תלות runtime/E2E/VM — `UNVERIFIED`; כל פער נוסף שיתגלה באימות `grep`/הרצה מתועד ויטופל רק בהחלטה מפורשת.
 
 ## 5. ממצאי מיפוי ותלויות
 
@@ -66,14 +65,14 @@
 | `README.md` (שורש) | חסר | לא ליצור ללא אישור |
 | `usbguard-approval-manager/.gitkeep`, `config/.gitkeep`, `conf/.gitkeep` | חסרים; תיקיות לא ריקות | לא ליצור |
 
-### 5.3 כפילויות/וריאציות (tracked, תוכן שונה) — דורשות קנוניות
-| קבוצה | נתיבים | הערה |
+### 5.3 כפילויות/וריאציות (tracked, תוכן שונה) — קנוניות מוצעת
+| קבוצה | נתיבים | קנוני |
 |---|---|---|
-| config-reader | `scripts/lib/config-reader.sh` ↔ `usbguard-approval-manager/scripts/lib/config-reader.sh` | חבילה ב-C3; שורש רק ב-Cx אם יאושר |
-| config examples | `etc/.../approval-manager.conf.example`, `usbguard-approval-manager/conf/...example`, `usbguard-approval-manager/config/...example` | עותקים שונים; לאמת שימוש בפועל |
-| logrotate/sudoers/systemd | root `logrotate|sudoers|systemd/*` ↔ `usbguard-approval-manager/{logrotate,sudoers,systemd}/*` | שונים; לאמת נתיבי deploy/install לפני C8 |
+| config-reader | `scripts/lib/config-reader.sh` ↔ `usbguard-approval-manager/scripts/lib/config-reader.sh` | **חבילה** (`usbguard-approval-manager/scripts/lib/`) ב-C3; עותק שורש להחרגה (Cx) אלא אם `grep` יצדיק |
+| config examples | `etc/.../approval-manager.conf.example`, `usbguard-approval-manager/conf/...example`, `usbguard-approval-manager/config/...example` | **`conf/`** ראשי (6 מפתחות, תואם `config-reader.sh`); `config/` example משני. `deploy.sh` מתקין את שניהם — לכלול ב-C8A; `etc/...` רק אם נדרש (C8B) |
+| logrotate/sudoers/systemd | root `logrotate|sudoers|systemd/*` ↔ `usbguard-approval-manager/{logrotate,sudoers,systemd}/*` | **חבילה** (`usbguard-approval-manager/...`) ב-C8A; root רק אם `grep` בסקריפטי הפריסה יצדיק (C8B) |
 
-**בדיקה חובה לפני C8:** `grep` ב-`deploy.sh`, `deploy-lib.sh`, `install-usbguard-approval-manager.sh` לנתיבי `etc/`, `systemd/`, `sudoers/`, `logrotate/` והצגת ממצאים לאישור C8A/C8B/Cx.
+**בדיקה חובה לפני C8:** `grep` ב-`deploy.sh`, `deploy-lib.sh`, `install-usbguard-approval-manager.sh` לנתיבי `etc/`, `systemd/`, `sudoers/`, `logrotate/` והצגת ממצאים לאישור סופי של C8A/C8B/Cx.
 
 ### 5.4 tracked לא במיפוי המקורי
 | נתיב | שיוך מוצע |
@@ -136,35 +135,37 @@
 ## 9. מפרט C8C — `INSTALL-FROM-SCRATCH.md` (אם יאושר)
 
 - **נתיב:** `usbguard-approval-manager/INSTALL-FROM-SCRATCH.md`
-- **שיוך:** קומיט `docs: add from-scratch installation guide` אחרי C8A/C8B ולפני C9b
-- **מסלול מרכזי (A1):** `deploy.sh` + הכנה ידנית (חבילות/`usbadmins`) + אזהרות על `install-usbguard-approval-manager.sh`
-- **אזהרות installer (אם קיים/מתועד):** הפעלת timers אוטומטית בניגוד למדיניות G-01, סיכוני הרשאות/אתחול (`/run/lock`, `ttl.json`, `audit.jsonl`, `clock_state.json`), קנוניות config, שלמות scripts (למשל `usbguard-status.sh`), חבילות חסרות/מיותרות, היעדר preflight/rollback
-- **מבנה מוצע (10 סעיפים):** דרישות מערכת; חבילות (Debian/Ubuntu, RHEL/Fedora); `usbadmins`/משתמשים; קבלת קוד; התקנה (`deploy.sh` staging/live + אזהרת installer); אימות (`validate_all.sh` לפי נתיב/החלטה, מגבלות ידועות); G-01 marker (לאמת נתיב/פורמט בקוד לפני ניסוח סופי); הפעלת timers רק לאחר שערים; בדיקה ראשונית read-only; הסרה (`deploy-uninstall.sh`) ותקלות נפוצות
-- **לפני ניסוח סופי:** לאמת נתיב/פורמט G-01 marker בקוד, שלמות scripts במסלולי ההתקנה, ויישור עם החלטות N2/C/A1.
+- **שיוך:** קומיט `docs: add from-scratch installation guide` (C8C), אחרי C8A/C8B ולפני C9b
+- **מסלול ראשי:** `deploy.sh` + הכנה ידנית (חבילות/`usbadmins`) — מומלץ בגלל preflight/rollback/אימותים
+- **מסלול חלופי:** `install-usbguard-approval-manager.sh` (מתוקן ב-`0964b04`) — התקנה מאפס: תיקיות, הרשאות, lock/state/audit, `usbguard-status.sh`, config מ-`conf/` + example משני, lib `0640`, **ללא הפעלת timers** (דורש G-01 + הפעלה ידנית)
+- **מבנה מוצע (10 סעיפים):** דרישות מערכת; חבילות (Debian/Ubuntu + RHEL/Fedora); `usbadmins`/משתמשים; קבלת קוד; התקנה (`deploy.sh` staging/live + installer מאפס); אימות (`validate_all.sh` לפי נתיב בפועל); G-01 marker (לאמת נתיב/פורמט בקוד לפני ניסוח סופי); הפעלת timers רק לאחר שערים; בדיקה ראשונית read-only; הסרה (`deploy-uninstall.sh`) ותקלות נפוצות
+- **לפני ניסוח סופי:** לאמת נתיב/פורמט G-01 marker בקוד, שלמות scripts במסלולי ההתקנה, ותאימות לגרסאות הקוד בבסיס ה-rebuild המאושר.
 
 ## 10. צ’קליסט החלטות לאישור (חובה לפני שלב A)
 
-| # | החלטה | ברירת מחדל מוצעת | אישור |
+**פתוחים לאישור: 13** (N1, N4, D1, D2, D4, D5, D6, D7, D8, D9, D10, A1, D12). **סגורים: 6** (N2, N3, D3, D11, B, C — טופלו/יושרו ב-`0964b04` או הובהרו).
+
+| # | החלטה | ברירת מחדל | סטטוס |
 |---|---|---|---|
-| N1 | סדר C9 | `C9a` לפני `C8`, `C9b` בסוף | ⏳ |
-| N2 | מיקום `validate_all.sh` | לשמר `usbguard-approval-manager/scripts/validate_all.sh` + לתעד אי-עקביות (`deploy.sh`/`Makefile`/מסלולים) | ⏳ |
-| N3 | מגבלות ולידציית גיבוי/`validate-backup` | לא לתקן ב-rebuild; לתעד לפי מצב הקוד בבסיס המאושר | ⏳ |
-| N4 | קומיט אתחול orphan + `.gitignore` שורש | לכלול `.venv/`, `__pycache__/`, `*.pyc`, `.pytest_cache/`, `.ruff_cache/`, `.benchmarks/`, `*.log` (ולהתאים אם הבסיס כבר כולל `.gitignore`) | ⏳ |
-| D1 | כפילויות קנוניות | C8A ברירת מחדל; C8B/Cx רק אם נדרש לאחר `grep` פריסה | ⏳ |
-| D2 | מקור 4 קבצים מתועדים | `docs/hebrew-comments` tip + diff מול `56fded1` לפני C2/C6 | ⏳ |
-| D3 | C0 | `usbguard-approval-manager/.gitignore`, `README.md`, `Makefile` בלבד | ⏳ |
-| D4 | שיוך G-01 | `test_g01_adapter.sh`, `collect_g01_readonly_preflight.sh` ב-C4 בלבד | ⏳ |
-| D5 | C8 | C8A כולל `conf/`+`config/`; C8B לפי ממצאים | ⏳ |
-| D6 | C10 | לכלול `ssh_connect.py`, `vm_client.py`; להחריג `audit_write_original.py` | ⏳ |
-| D7 | Cx | לכלול/להחריג לפי צורך תאימות | ⏳ |
-| D8 | חריגי תחביר בין-שלביים | תלות מותרת רק עם ציטוט `source/import`+קובץ חסר ואישור נקודתי | ⏳ |
-| D9 | גורל `rebuild` | ענף נפרד/ארכיון, ללא merge/push עד אישור נפרד | ⏳ |
-| D10 | גורל `docs/hebrew-comments` | ללא שינוי/merge/מחיקה | ⏳ |
-| D11 | `__pycache__`/ארטיפקטים | החרגה מלאה מ-rebuild | ⏳ |
-| A1 | מסלול התקנה בתיעוד | `deploy.sh` מרכזי; installer מתועד כאזהרה/לא מומלץ במצבו הנוכחי | ⏳ |
-| B | תיקון installer ב-rebuild | לא לתקן (אלא אם חריג מאושר); לתעד פערים | ⏳ |
-| C | עקביות `validate_all.sh` | לשמר מיקום `scripts/` ולתעד פערי קריאה/שימוש | ⏳ |
-| D12 | `INSTALL-FROM-SCRATCH.md` / C8C | ליצור קובץ חדש ב-`usbguard-approval-manager/INSTALL-FROM-SCRATCH.md` כ-C8C (אישור מפורש) | ⏳ |
+| N1 | סדר C9: `C9a` לפני `C8`, `C9b` בסוף | כן | ⏳ פתוח |
+| N2 | מיקום/עקביות `validate_all.sh` | טופל ב-`0964b04` (`deploy.sh`/`Makefile` → `scripts/validate_all.sh`) | ✅ סגור |
+| N3 | `lifecycle.py validate-backup` | טופל ב-`0964b04` (נוסף subcommand) | ✅ סגור |
+| N4 | קומיט init orphan + `.gitignore` שורש | לכלול `.venv/`, `__pycache__/`, `*.pyc`, `.pytest_cache/`, `.ruff_cache/`, `.benchmarks/`, `*.log` (ולהתאים לבסיס שכבר כולל `.gitignore`) | ⏳ פתוח |
+| D1 | כפילויות קנוניות | C8A ברירת מחדל (חבילה קנונית); C8B/Cx רק אם `grep` פריסה יצדיק — לאמת לפני C8 | ⏳ פתוח |
+| D2 | מקור 4 קבצים מתועדים | `docs/hebrew-comments` tip + diff מול `56fded1` לפני C2/C6 | ⏳ פתוח |
+| D3 | C0 = 3 קבצים קיימים | קיים (`usbguard-approval-manager/.gitignore`, `README.md`, `Makefile`) | ✅ סגור |
+| D4 | שיוך G-01 integration | `test_g01_adapter.sh`, `collect_g01_readonly_preflight.sh` ב-C4 בלבד | ⏳ פתוח |
+| D5 | C8A כולל דוגמאות config | לכלול גם `conf/` וגם `config/` | ⏳ פתוח |
+| D6 | C10 | לכלול `ssh_connect.py`, `vm_client.py`; להחריג `audit_write_original.py` | ⏳ פתוח |
+| D7 | Cx | להחריג (`scripts/lib/config-reader.sh`, `.gitkeep` שורש) אלא אם תאימות נדרשת | ⏳ פתוח |
+| D8 | חריגי תחביר בין-שלביים | תלות מותרת רק עם ציטוט `source/import` + קובץ חסר + אישור נקודתי | ⏳ פתוח |
+| D9 | גורל `rebuild` | ענף נפרד/ארכיון, ללא merge/push עד אישור נפרד | ⏳ פתוח |
+| D10 | גורל `docs/hebrew-comments` | ללא שינוי/merge/מחיקה (משוחזר ב-`e73d62b`) | ⏳ פתוח |
+| D11 | `__pycache__`/ארטיפקטים | הוסר מ-`main` ונוסף `.gitignore`; החרגה מלאה מ-rebuild | ✅ סגור |
+| A1 | מסלול התקנה בתיעוד | `deploy.sh` ראשי; installer מתוקן (`0964b04`) = חלופה לגיטימית מאפס | ⏳ פתוח (מעודכן) |
+| B | תיקון installer ב-rebuild | טופל ב-`0964b04` (לא נדרש תיקון נוסף ב-rebuild) | ✅ סגור |
+| C | עקביות `validate_all.sh` | טופל ב-`0964b04` (זהה ל-N2) | ✅ סגור |
+| D12 | `INSTALL-FROM-SCRATCH.md` / C8C | ליצור `usbguard-approval-manager/INSTALL-FROM-SCRATCH.md` כ-C8C (מתעד גם installer מתוקן) | ⏳ פתוח |
 
 ---
 
