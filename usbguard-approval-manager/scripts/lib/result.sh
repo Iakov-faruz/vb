@@ -19,7 +19,6 @@
 #   result_add_item ...               - הוספת item ל-JSON
 #   result_print_json                 - הדפסת JSON
 #   result_exit                       - exit עם RESULT_EXIT_CODE
-"
 # scripts/lib/result.sh
 # USBGuard Approval Manager — Error / Result Model
 #

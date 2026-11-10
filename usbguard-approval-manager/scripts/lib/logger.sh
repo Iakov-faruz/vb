@@ -14,7 +14,6 @@
 #   log_audit <action> <policy_result> <correlation_id> [details] - Audit JSONL
 #
 # אזהרה: Audit write failure must be reported; policy outcome preserved.
-"
 # Separate operational logging from the protected Audit JSONL stream.
 
 if [[ "$(declare -p USBAM_LOGGER_LIBRARY_LOADED 2>/dev/null || true)" != "declare -r USBAM_LOGGER_LIBRARY_LOADED="* ]]; then

@@ -8,7 +8,6 @@
 # מאפשר קריאה בטוחה של הגדרות ללא חשיפת מידע רגיש.
 #
 # CONFIG_KEY_SPECS מגדיר type|default|min|max לכל key.
-"
 # Secure, data-only reader for the approved SRS v4.5 configuration keys.
 
 if [[ "$(declare -p CONFIG_READER_LOADED 2>/dev/null || true)" != \
