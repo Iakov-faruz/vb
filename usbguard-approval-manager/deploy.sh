@@ -412,13 +412,13 @@ verify_installed_files() {
   fi
 
   if (( DEPLOY_STAGE )); then
-    if USBAM_ROOT="$DEPLOY_ROOT" bash "$PROJECT_ROOT/validate_all.sh" --static; then
+    if USBAM_ROOT="$DEPLOY_ROOT" bash "$PROJECT_ROOT/scripts/validate_all.sh" --static; then
       result=0
     else
       result=$?
     fi
   else
-    if bash "$PROJECT_ROOT/validate_all.sh" --static; then
+    if bash "$PROJECT_ROOT/scripts/validate_all.sh" --static; then
       result=0
     else
       result=$?

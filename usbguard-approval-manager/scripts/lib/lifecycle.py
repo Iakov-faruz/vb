@@ -767,6 +767,9 @@ def _parse_args(arguments: list[str]) -> argparse.Namespace:
 
     validate = subparsers.add_parser("validate-export")
     validate.add_argument("--file", type=Path, required=True)
+
+    validate_backup = subparsers.add_parser("validate-backup")
+    validate_backup.add_argument("--backup", type=Path, required=True)
     return parser.parse_args(arguments)
 
 
@@ -789,6 +792,8 @@ def main(arguments: list[str] | None = None) -> int:
             recover_restore(options.journal, options.rollback_root, options.targets)
         elif options.command == "validate-export":
             print(json.dumps(validate_export_file(options.file), ensure_ascii=False))
+        elif options.command == "validate-backup":
+            read_backup(options.backup)
         return 0
     except (LifecycleError, OSError, ValueError) as error:
         print(f"lifecycle: ERROR: {error}", file=sys.stderr)

@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+
+# Editor / OS
+*.swp
+*.tmp
+.DS_Store
+
+# Benchmarks
+.benchmarks/
+
+# Logs
+*.log

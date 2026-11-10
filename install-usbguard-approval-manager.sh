@@ -29,11 +29,15 @@ REQUIRED_PACKAGES=(
     "bash"
     "python3"
     "jq"
-    "usbutils"
-    "usbmuxd"
-    "libusb-1.0-0-dev"
-    "pkg-config"
     "usbguard"
+    "util-linux"
+    "bsdutils"
+    "whiptail"
+    "logrotate"
+    "sudo"
+    "systemd"
+    "coreutils"
+    "diffutils"
 )
 
 ###############################################################################
@@ -77,17 +81,52 @@ ensure_directories() {
         "$LIBEXEC_DIR"
         "$LIBEXEC_DIR/lib"
         "$CONFIG_ETC"
+        "$CONFIG_ETC/config"
         "$STATE_DIR"
         "$BACKUP_DIR"
         "$LOG_DIR"
-        "$LOCK_DIR"
     )
     for d in "${dirs[@]}"; do
         mkdir -p "$d"
     done
-    chmod 755 "$LIBEXEC_DIR" "$LIBEXEC_DIR/lib" "$CONFIG_ETC" "$STATE_DIR" "$BACKUP_DIR" "$LOG_DIR" "$LOCK_DIR"
+    # NOTE: /run/lock is a system directory owned by root:root.
+    # Do NOT chmod/chown the directory itself. Only the lock file inside it
+    # is managed (see ensure_state_files).
+    chmod 750 "$LIBEXEC_DIR" "$LIBEXEC_DIR/lib" "$CONFIG_ETC" "$CONFIG_ETC/config"
     chmod 700 "$STATE_DIR" "$BACKUP_DIR"
-    chmod 750 "$LOCK_DIR"
+    chmod 750 "$LOG_DIR"
+    chown root:root "$LIBEXEC_DIR" "$LIBEXEC_DIR/lib" "$CONFIG_ETC" "$CONFIG_ETC/config"
+    chown root:root "$STATE_DIR" "$BACKUP_DIR"
+    chown root:usbadmins "$LOG_DIR"
+}
+
+ensure_state_files() {
+    log_info "Ensuring required state files exist..."
+    # Lock file: /run/lock/usbguard-approval-manager.lock (root:root, 0600)
+    local lock_file="$LOCK_DIR/usbguard-approval-manager.lock"
+    if [[ ! -f "$lock_file" ]]; then
+        touch "$lock_file"
+    fi
+    chmod 600 "$lock_file"
+    chown root:root "$lock_file"
+
+    # ttl.json: root:root, 0600
+    local ttl_file="$STATE_DIR/ttl.json"
+    if [[ ! -f "$ttl_file" ]]; then
+        printf '%s\n' '{"schema_version":1,"records":[]}' > "$ttl_file"
+    fi
+    chmod 600 "$ttl_file"
+    chown root:root "$ttl_file"
+
+    # audit.jsonl: root:usbadmins, 0640
+    local audit_file="$LOG_DIR/audit.jsonl"
+    if [[ ! -f "$audit_file" ]]; then
+        : > "$audit_file"
+    fi
+    chmod 640 "$audit_file"
+    chown root:usbadmins "$audit_file"
+
+    # clock_state.json is created automatically by clock_state.py on first use.
 }
 
 install_scripts() {
@@ -97,6 +136,7 @@ install_scripts() {
         "usb-revoke.sh"
         "usb-revoke-interactive.sh"
         "usb-list.sh"
+        "usbguard-status.sh"
         "backup.sh"
         "restore.sh"
         "cleanup-expired.sh"
@@ -140,11 +180,10 @@ install_lib_files() {
         local dst="$LIBEXEC_DIR/lib/$l"
         [[ -f "$src" ]] || { log_warn "Source not found: $src"; continue; }
         cp -f "$src" "$dst"
-        if [[ "$l" == *.sh ]]; then
-            chmod 750 "$dst"
-        else
-            chmod 640 "$dst"
-        fi
+        # All lib files are sourced or invoked as 'python3 file.py':
+        # they must NOT be executable. Mode 0640 matches deploy.sh and
+        # validate_all.sh expectations.
+        chmod 640 "$dst"
         chown root:root "$dst"
     done
 }
@@ -189,12 +228,31 @@ install_logrotate() {
 
 install_config() {
     log_info "Installing configuration files..."
-    local config_example_src="$PROJECT_ROOT/usbguard-approval-manager/config/usbguard-approval-manager.conf.example"
-    local dst="$CONFIG_ETC/approval-manager.conf"
-    [[ -f "$config_example_src" ]] || { log_warn "Config source not found"; return; }
-    cp -f "$config_example_src" "$dst"
-    chmod 600 "$dst"
-    chown root:root "$dst"
+    # Primary config comes from conf/approval-manager.conf.example
+    # (matches deploy.sh). This file contains only the 6 SRS keys that
+    # config-reader.sh accepts.
+    local primary_src="$PROJECT_ROOT/usbguard-approval-manager/conf/approval-manager.conf.example"
+    local primary_dst="$CONFIG_ETC/approval-manager.conf"
+    if [[ -f "$primary_src" ]]; then
+        cp -f "$primary_src" "$primary_dst"
+        chmod 600 "$primary_dst"
+        chown root:root "$primary_dst"
+    else
+        log_warn "Primary config source not found: $primary_src"
+    fi
+
+    # Secondary reference example (matches deploy.sh CONFIG_CONF_REL).
+    # Contains extra keys not accepted by config-reader.sh; must never be
+    # used as the primary config.
+    local example_src="$PROJECT_ROOT/usbguard-approval-manager/config/usbguard-approval-manager.conf.example"
+    local example_dst="$CONFIG_ETC/config/usbguard-approval-manager.conf.example"
+    if [[ -f "$example_src" ]]; then
+        cp -f "$example_src" "$example_dst"
+        chmod 600 "$example_dst"
+        chown root:root "$example_dst"
+    else
+        log_warn "Secondary config example not found: $example_src"
+    fi
 }
 
 ###############################################################################
@@ -210,6 +268,7 @@ main() {
     install_packages
     ensure_groups
     ensure_directories
+    ensure_state_files
 
     install_scripts
     install_lib_files
@@ -218,23 +277,24 @@ main() {
     install_logrotate
     install_config
 
-    # Verify usbguard is installed
     if ! command -v usbguard >/dev/null 2>&1; then
         log_warn "USBGuard not found; attempting installation..."
         apt-get install -y -qq usbguard 2>/dev/null || log_warn "Failed to install USBGuard"
     fi
 
-    # Reload systemd
     log_info "Reloading systemd daemon..."
     systemctl daemon-reload 2>/dev/null || log_warn "systemctl daemon-reload failed"
 
-    # Enable timers
-    log_info "Enabling TTL timer and Reaper timer..."
-    systemctl enable --now usbguard-approval-ttl.timer 2>/dev/null || log_warn "Failed to enable TTL timer"
-    systemctl enable --now usbguard-approval-manager-reaper.timer 2>/dev/null || log_warn "Failed to enable reaper timer"
+    # IMPORTANT: Timers are NOT enabled automatically.
+    # cleanup-expired.sh requires a G-01 verification marker before any
+    # policy change. Enabling timers without G-01 causes repeated failures
+    # and violates SRS.
+    log_info "Timers installed but NOT enabled (G-01 verification required before enabling)."
+    log_info "After G-01 approval, enable manually with:"
+    log_info "  systemctl enable --now usbguard-approval-ttl.timer"
+    log_info "  systemctl enable --now usbguard-approval-manager-reaper.timer"
 
-    # Verify installation
-    log_info "Verifying installation..."
+    log_info "Verifying installation (static)..."
     if bash "$PROJECT_ROOT/usbguard-approval-manager/scripts/validate_all.sh" --static; then
         log_info "Static validation PASSED"
     else
@@ -245,11 +305,22 @@ main() {
     log_info "Summary:"
     log_info "  - Scripts installed to: $LIBEXEC_DIR"
     log_info "  - Config: $CONFIG_ETC/approval-manager.conf"
+    log_info "  - Config example: $CONFIG_ETC/config/usbguard-approval-manager.conf.example"
     log_info "  - State: $STATE_DIR"
     log_info "  - Logs: $LOG_DIR"
     log_info "  - Sudoers: $SUDOERS_D/usbguard-approval-manager"
     log_info "  - Logrotate: $LOGROTATE/usbguard-approval-manager"
-    log_info "  - Systemd units enabled"
+    log_info "  - Systemd units installed (NOT enabled)"
+    log_info ""
+    log_info "Next steps:"
+    log_info "  1. Add admin users to the usbadmins group:"
+    log_info "       usermod -aG usbadmins <user>"
+    log_info "  2. Complete G-01 verification per DOCS (isolated lab VM, USB passthrough)."
+    log_info "  3. After G-01 approval, create /var/lib/usbguard-approval-manager/g01-verified"
+    log_info "       with content 'G01_STATUS=PASS', mode 0600, owner root:root."
+    log_info "  4. Enable timers:"
+    log_info "       systemctl enable --now usbguard-approval-ttl.timer"
+    log_info "       systemctl enable --now usbguard-approval-manager-reaper.timer"
 }
 
 main "$@"
