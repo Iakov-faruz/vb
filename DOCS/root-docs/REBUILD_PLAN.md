@@ -18,6 +18,7 @@
 | בסיס קודם | `56fded1` (`backup/origin-main`, `backup/main-before-rewrite`, `backup/main-original-messages-20261110`) |
 | `docs/hebrew-comments` (מקומי/מרוחק) | `e73d62b` — tip משוחזר (כולל `802517f`, `9e71b12` ומסמך התוכנית); ללא שינוי נוסף, לא ימוזג ל-`rebuild` ולא יימחק |
 | ענף תיקוני קדם-rebuild | `fix/pre-rebuild` — נמחק (מקומי+מרוחק) לאחר מיזוג; התיקונים קיימים ב-`main` |
+| ענף `rebuild` (worktree) | Init `587bdb1`, C0 `da28034`, C1 `02e30d8` (17 קבצי אפיון) |
 | גיבוי נוסף | `backup/docs-hebrew-comments-before-cleanup` @ `eea113f` |
 
 **הערת הקשר:** `C:\Users\5722y\Desktop\vb` (`5722yz-ops/USB5722.git`, `08e1b09`) ו-`C:\Users\5722y\Desktop\USB` (לא ריפו Git) אינם בסיס לתוכנית זו, אלא אם יאושר מיזוג/העתקה מפורש.
@@ -46,6 +47,8 @@
 | תכנון/מסמכים | `DOCS/root-docs/REBUILD_PLAN.md` מנוקה ומוזגה ל-`main` (המקור ההיסטורי נשמר ב-`docs/hebrew-comments`) |
 
 **עדיין ידוע/לא מתוקן בכוונה:** תלות runtime/E2E/VM — `UNVERIFIED`; כל פער נוסף שיתגלה באימות `grep`/הרצה מתועד ויטופל רק בהחלטה מפורשת.
+
+**היקף C1 עודכן (החלטה S1):** C1 כולל 17 קבצי אפיון בלבד — `DOCS/foundation/01-07` (7), `DOCS/root-docs/{USB,IMPLEMENTATION_ROADMAP,README,stop-conditions,global-working-rules,data}.md` (6), `DOCS/usbguard-approval-manager/{DEPLOYMENT,FLOW,lab-checklist,SECURITY_REVIEW}.md` (4). **הוחרגו:** `DOCS/phases/08-33` (26 פרומפטים), `REBUILD_PLAN.md`, `AGENT-WORKFLOW.md`, `learning-prompt.md`, `review-prompt.md`, `.ps1` (2), דוחות בדיקה (4). כולם נשארים ב-`main` ואינם נכנסים ל-`rebuild`.
 
 ## 5. ממצאי מיפוי ותלויות
 
@@ -103,7 +106,7 @@
 |---:|---|---|---|
 | Init (אם מאושר) | `chore: initialize empty orphan branch` | `.gitignore` שורש (תוכן מאושר) | לאחר `git switch --orphan rebuild` + `git rm -rf --cached .` |
 | C0 | `chore: initialize project skeleton and directory structure` | `usbguard-approval-manager/.gitignore`, `usbguard-approval-manager/README.md`, `usbguard-approval-manager/Makefile` | `Makefile` לא מלא-פונקציונלי עד שלבים מאוחרים |
-| C1 | `docs: add SRS, roadmap, and phase specifications` | `DOCS/**` (52) — נספח א׳ | ללא תלות קוד |
+| C1 | `docs: add product SRS and core specifications` | `DOCS/foundation/01-07` (7), `DOCS/root-docs/{USB,IMPLEMENTATION_ROADMAP,README,stop-conditions,global-working-rules,data}.md` (6), `DOCS/usbguard-approval-manager/{DEPLOYMENT,FLOW,lab-checklist,SECURITY_REVIEW}.md` (4) — סה"כ 17 (נספח א׳) | ללא תלות קוד; הוחרגו phases/prompts/reports לפי S1 |
 | C2 | `feat(lib): add atomic write, audit logger, and clock state primitives` | `scripts/lib/atomic-write.py` `[*]`, `audit_write.py` `[*]`, `clock_state.py` `[*]`, `tests/unit/__init__.py`, `test_atomic_write.py`, `test_audit_write.py` | תלויות import/run-time עתידיות ל-C3 אפשריות |
 | C3 | `feat(lib): implement config parser, locking, result model, logging, and validators` | `scripts/lib/config-reader.sh`, `lock.sh`, `result.sh`, `logger.sh`, `validators.sh`, `tests/unit/test_config_reader.sh`, `test_lock.sh`, `test_result.sh`, `test_logger.sh`, `test_validators.sh` | `source` פנימי נכלל בקומיט |
 | C4 | `feat(policy): implement USBGuard adapter and G-01 validation` | `scripts/lib/usbguard-policy.sh`, `tests/unit/test_policy_read.sh`, `test_policy_write.sh`, `test_g01_preflight_readonly.sh`, `tests/integration/test_g01_adapter.sh`, `tests/integration/collect_g01_readonly_preflight.sh`, `tests/quick/g01_status_check.sh`, `tests/quick/run_g01_integration.sh` | תלוי ב-C3; G-01 integration כאן פעם אחת בלבד |
@@ -143,10 +146,11 @@
 
 ## 10. צ’קליסט החלטות לאישור (חובה לפני שלב A)
 
-**פתוחים לאישור: 13** (N1, N4, D1, D2, D4, D5, D6, D7, D8, D9, D10, A1, D12). **סגורים: 6** (N2, N3, D3, D11, B, C — טופלו/יושרו ב-`0964b04` או הובהרו).
+**פתוחים: 12** (N1, N4, D1, D2, D4, D5, D6, D7, D8, D9, D10, A1, D12). **סגורים: 7** (S1, N2, N3, D3, D11, B, C — טופלו/יושרו או אושרו).
 
 | # | החלטה | ברירת מחדל | סטטוס |
 |---|---|---|---|
+| S1 | היקף C1 | 17 קבצי אפיון ליבה בלבד; פרומפטים/דוחות/`.ps1`/`REBUILD_PLAN.md` נשארים ב-`main` | ✅ סגור (אושר) |
 | N1 | סדר C9: `C9a` לפני `C8`, `C9b` בסוף | כן | ⏳ פתוח |
 | N2 | מיקום/עקביות `validate_all.sh` | טופל ב-`0964b04` (`deploy.sh`/`Makefile` → `scripts/validate_all.sh`) | ✅ סגור |
 | N3 | `lifecycle.py validate-backup` | טופל ב-`0964b04` (נוסף subcommand) | ✅ סגור |
@@ -169,10 +173,27 @@
 
 ---
 
-## נספח א׳ — `DOCS/` ל-C1 (52 קבצים)
+## נספח א׳ — `DOCS/` ל-C1 (17 קבצי אפיון ליבה)
 
-`DOCS/foundation/01-repo-srs-inspection.md`, `DOCS/foundation/02-implementation-plan.md`, `DOCS/foundation/03-plan-review.md`, `DOCS/foundation/04-env-verification.md`, `DOCS/foundation/05-project-skeleton.md`, `DOCS/foundation/06-config-parser.md`, `DOCS/foundation/07-error-result-model.md`, `DOCS/phases/08-logging-audit.md`, `DOCS/phases/09-locking-concurrency.md`, `DOCS/phases/10-atomic-write.md`, `DOCS/phases/11-parsing-validation.md`, `DOCS/phases/12-time-ttl-clock.md`, `DOCS/phases/13-usbguard-adapter-readonly.md`, `DOCS/phases/14-lab-preparation.md`, `DOCS/phases/15-g01-part1.md`, `DOCS/phases/16-g01-part2.md`, `DOCS/phases/17-ttl-data-model.md`, `DOCS/phases/18-reconciliation-readonly.md`, `DOCS/phases/19-temporary-approval.md`, `DOCS/phases/20-permanent-approval.md`, `DOCS/phases/21-reaper-expiry.md`, `DOCS/phases/22-recovery.md`, `DOCS/phases/23-cli.md`, `DOCS/phases/24-tui-whiptail.md`, `DOCS/phases/25-batch-operations.md`, `DOCS/phases/26-backup-restore.md`, `DOCS/phases/27-json-import-export.md`, `DOCS/phases/28-systemd-deployment.md`, `DOCS/phases/29-deployment-scripts.md`, `DOCS/phases/30-health-validation.md`, `DOCS/phases/31-security-review.md`, `DOCS/phases/32-fix-security-findings.md`, `DOCS/phases/33-release-matrix.md`, `DOCS/root-docs/backup-prompts.ps1`, `DOCS/root-docs/data.md`, `DOCS/root-docs/fix-prompt-numbering.ps1`, `DOCS/root-docs/global-working-rules.md`, `DOCS/root-docs/IMPLEMENTATION_ROADMAP.md`, `DOCS/root-docs/learning-prompt.md`, `DOCS/root-docs/README.md`, `DOCS/root-docs/review-prompt.md`, `DOCS/root-docs/stop-conditions.md`, `DOCS/root-docs/TEST_REPORT_PRODUCTION_READINESS.md`, `DOCS/root-docs/USB.md`, `DOCS/usbguard-approval-manager/AGENT-WORKFLOW.md`, `DOCS/usbguard-approval-manager/DEPLOYMENT.md`, `DOCS/usbguard-approval-manager/DOD_REPORT.md`, `DOCS/usbguard-approval-manager/FLOW.md`, `DOCS/usbguard-approval-manager/g01-preflight-report.md`, `DOCS/usbguard-approval-manager/lab-checklist.md`, `DOCS/usbguard-approval-manager/SECURITY_REVIEW.md`, `DOCS/usbguard-approval-manager/TEST-RESULTS.md`.
+1. `DOCS/foundation/01-repo-srs-inspection.md`
+2. `DOCS/foundation/02-implementation-plan.md`
+3. `DOCS/foundation/03-plan-review.md`
+4. `DOCS/foundation/04-env-verification.md`
+5. `DOCS/foundation/05-project-skeleton.md`
+6. `DOCS/foundation/06-config-parser.md`
+7. `DOCS/foundation/07-error-result-model.md`
+8. `DOCS/root-docs/USB.md`
+9. `DOCS/root-docs/IMPLEMENTATION_ROADMAP.md`
+10. `DOCS/root-docs/README.md`
+11. `DOCS/root-docs/stop-conditions.md`
+12. `DOCS/root-docs/global-working-rules.md`
+13. `DOCS/root-docs/data.md`
+14. `DOCS/usbguard-approval-manager/DEPLOYMENT.md`
+15. `DOCS/usbguard-approval-manager/FLOW.md`
+16. `DOCS/usbguard-approval-manager/lab-checklist.md`
+17. `DOCS/usbguard-approval-manager/SECURITY_REVIEW.md`
 
+**36 קבצים שהוחרגו ונשארים ב-`main`:** `DOCS/phases/08-33` (26), `DOCS/root-docs/REBUILD_PLAN.md`, `DOCS/root-docs/backup-prompts.ps1`, `DOCS/root-docs/fix-prompt-numbering.ps1`, `DOCS/root-docs/learning-prompt.md`, `DOCS/root-docs/review-prompt.md`, `DOCS/root-docs/TEST_REPORT_PRODUCTION_READINESS.md`, `DOCS/usbguard-approval-manager/AGENT-WORKFLOW.md`, `DOCS/usbguard-approval-manager/DOD_REPORT.md`, `DOCS/usbguard-approval-manager/TEST-RESULTS.md`, `DOCS/usbguard-approval-manager/g01-preflight-report.md`.
 ## נספח ב׳ — אינטגרציה ל-C9b
 
 `usbguard-approval-manager/tests/integration/run_integration_tests.sh`, `usbguard-approval-manager/tests/integration/test_T01.sh`, `usbguard-approval-manager/tests/integration/test_T02.sh`, `usbguard-approval-manager/tests/integration/test_T03_revoke_and_cleanup.sh`, `usbguard-approval-manager/tests/integration/test_T04_backup_restore.sh`, `usbguard-approval-manager/tests/integration/test_T05_clock_and_reboot.sh`, `usbguard-approval-manager/tests/integration/test_T06_phase6.sh`, `usbguard-approval-manager/tests/integration/test_T07_persistence.sh`, `usbguard-approval-manager/tests/integration/test_T08.sh`, `usbguard-approval-manager/tests/integration/test_T09.sh`, `usbguard-approval-manager/tests/integration/test_T10.sh`, `usbguard-approval-manager/tests/integration/test_T11.sh`, `usbguard-approval-manager/tests/integration/test_T12.sh`, `usbguard-approval-manager/tests/integration/test_T13.sh`, `usbguard-approval-manager/tests/integration/test_T14.sh`, `usbguard-approval-manager/tests/integration/test_T15.sh`, `usbguard-approval-manager/tests/integration/test_T16.sh`, `usbguard-approval-manager/tests/integration/test_T17.sh`, `usbguard-approval-manager/tests/integration/test_T18.sh`, `usbguard-approval-manager/tests/integration/test_T19.sh`, `usbguard-approval-manager/tests/integration/test_T20.sh`, `usbguard-approval-manager/tests/integration/test_T21.sh`, `usbguard-approval-manager/tests/integration/test_T22.sh`, `usbguard-approval-manager/tests/integration/test_T23.sh`, `usbguard-approval-manager/tests/integration/test_T24.sh`, `usbguard-approval-manager/tests/integration/test_T25.sh`, `usbguard-approval-manager/tests/integration/test_T26.sh`, `usbguard-approval-manager/tests/integration/test_T27.sh`, `usbguard-approval-manager/tests/integration/test_T28.sh`.
